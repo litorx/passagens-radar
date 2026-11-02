@@ -1,0 +1,55 @@
+{
+  "ativo": true,
+  "origens": [
+    "GRU",
+    "CGH",
+    "VCP"
+  ],
+  "destinos": [
+    "SCL",
+    "EZE",
+    "AEP",
+    "MVD",
+    "LIM",
+    "ASU",
+    "COR",
+    "MDZ",
+    "BOG",
+    "MDE",
+    "CTG",
+    "UIO",
+    "CUZ",
+    "LPB",
+    "VVI",
+    "PTY",
+    "BRC",
+    "USH",
+    "FTE",
+    "PUQ"
+  ],
+  "ate": "2027-12-31",
+  "antecedencia_min_dias": 7,
+  "passo_dias": 3,
+  "duracoes": [
+    5,
+    7,
+    10
+  ],
+  "intervalo_horas": 3,
+  "pares_por_rodada": 60,
+  "silencio": {
+    "inicio": 23,
+    "fim": 7
+  },
+  "sensibilidade": 25,
+  "limites": {},
+  "milhas": {
+    "ativo": true,
+    "custo_milheiro": 16.0,
+    "limites_milhas": {},
+    "sensibilidade": 25
+  },
+  "bot": {
+    "chat_id": ""
+  }
+}
