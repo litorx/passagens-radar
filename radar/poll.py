@@ -81,7 +81,8 @@ def dispatch_scan() -> str:
         import subprocess
         try:
             ok = subprocess.run(["gh", "workflow", "run", "scan.yml", "-f", "force=true"], cwd=config.ROOT,
-                                capture_output=True, timeout=60).returncode == 0
+                                capture_output=True, timeout=60,
+                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).returncode == 0
         except Exception:  # noqa: BLE001
             ok = False
     return "🔎 Varredura disparada. Leva uns 5 minutos." if ok else "Não consegui disparar; rode a Action 'scan' manualmente."

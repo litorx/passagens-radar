@@ -13,7 +13,9 @@ from . import config, poll
 
 
 def g(*a):
-    return subprocess.run(["git", *a], cwd=config.ROOT, capture_output=True, text=True, timeout=120)
+    # CREATE_NO_WINDOW: sem isso o git.exe abre uma janela de console que pisca a cada execucao (Windows).
+    return subprocess.run(["git", *a], cwd=config.ROOT, capture_output=True, text=True, timeout=120,
+                          creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
 
 
 def main() -> int:
