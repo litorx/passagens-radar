@@ -13,7 +13,7 @@ import sys
 import time
 from datetime import date, datetime, timedelta
 
-from . import config, notify, store
+from . import config, msg, notify, store
 from .airports import nome
 from .outlier import judge
 from .sources import kiwi
@@ -125,13 +125,14 @@ def run(dry: bool = False, force: bool = False, limit_dest: int | None = None, m
         v_per = judge(best["total"], sample, cfg["sensibilidade"], min_n=4)
         v_his = judge(best["total"], store.sample(st, bucket), cfg["sensibilidade"], min_n=5)
         cap = cfg["limites"].get(dest)
-        why = (v_per.reason + " no período" if v_per.is_outlier else
-               v_his.reason + " vs histórico" if v_his.is_outlier else
-               f"abaixo do seu limite ({brl(cap)})" if cap and best["total"] <= cap else "")
+        why = ("Bem mais barata que o normal para esse período" if v_per.is_outlier else
+               "Bem mais barata que o histórico dessa rota" if v_his.is_outlier else
+               f"Abaixo do seu limite ({brl(cap)})" if cap and best["total"] <= cap else "")
+        pct = v_per.drop_pct if v_per.is_outlier else v_his.drop_pct if v_his.is_outlier else None
         store.add_obs(st, bucket, best["total"], d=best["dep"], r=best["ret"])
         res[dest] = {"top": allrows[:3], "t": now.isoformat(timespec="minutes"), "amostra": sample}
         if why and store.should_alert(st, f"{dest}-{best['dep']}-{best['ret']}", best["total"]):
-            deals.append(fmt_deal(dest, best, why))
+            deals.append(msg.deal_dinheiro(dest, best, why, pct))
         print(f"  {dest}: menor {brl(best['total'])} ({best['dep']}→{best['ret']}) {', '.join(best['air'])}")
         time.sleep(random.uniform(0.6, 1.4))
 
@@ -178,7 +179,7 @@ def run(dry: bool = False, force: bool = False, limit_dest: int | None = None, m
            "destinos": len(cfg["destinos"]), "cobertos": len(rows), "bagagem": cfg.get("bagagem", "mao"), "top": rows[:30]}
 
     hoje = config.now_brt().date().isoformat()
-    if not quiet and st.get("heartbeat") != hoje and config.now_brt().hour >= 12 and rows and not dry:
+    if cfg.get("resumo_diario") and not quiet and st.get("heartbeat") != hoje and config.now_brt().hour >= 12 and rows and not dry:
         linhas = chr(10).join(f"• {nome(r['dest'])}: {brl(r['total'])}" for r in rows[:5])
         if notify.tg_send(f"🟢 Radar vivo. Menores valores no período:{chr(10)}{linhas}", cid, dry):
             st["heartbeat"] = hoje

@@ -47,16 +47,17 @@
     "inicio": 23,
     "fim": 7
   },
-  "sensibilidade": 25,
+  "sensibilidade": 35,
   "limites": {},
   "milhas": {
     "ativo": true,
     "custo_milheiro": 16.0,
     "limites_milhas": {},
-    "sensibilidade": 25,
+    "sensibilidade": 35,
+    "exigencia": 1.5,
+    "latam": true,
     "buscas_por_rodada": 16,
     "descanso_horas": 3,
-    "latam": false,
     "passo_dias": 10,
     "duracoes": [
       7
@@ -98,6 +99,7 @@
       "GRU": []
     }
   },
+  "resumo_diario": false,
   "bot": {
     "chat_id": ""
   }

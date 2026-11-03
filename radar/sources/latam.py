@@ -37,10 +37,14 @@ def best(text: str) -> dict | None:
     return {"milhas": mn[0], "taxas": mn[1], "n": len(offers)}
 
 
-def url(origin: str, dest: str, day: date) -> str:
-    return ("https://www.latamairlines.com/br/pt/oferta-voos?origin=%s&outbound=%sT00%%3A00%%3A00.000Z"
-            "&destination=%s&adt=1&chd=0&inf=0&trip=OW&cabin=Economy&redemption=true&sort=RECOMMENDED"
-            % (origin, day.isoformat(), dest))
+def url(origin: str, dest: str, day: date, back: date | None = None) -> str:
+    """Com `back` usa o modo IDA E VOLTA (e o preco por trecho que os grupos mostram: GRU-FRA 70.024 milhas);
+    so-ida costuma ser bem mais caro (GRU-FRA 122.918)."""
+    base = ("https://www.latamairlines.com/br/pt/oferta-voos?origin=%s&destination=%s&adt=1&chd=0&inf=0&cabin=Economy"
+            "&sort=PRICE%%2Casc&outbound=%sT00%%3A00%%3A00.000Z" % (origin, dest, day.isoformat()))
+    if back:
+        return base + "&inbound=%sT00%%3A00%%3A00.000Z&trip=RT&redemption=true" % back.isoformat()
+    return base + "&trip=OW&redemption=true"
 
 
 class Latam:
@@ -61,9 +65,9 @@ class Latam:
         except Exception:  # noqa: BLE001
             pass
 
-    def search(self, origin: str, dest: str, day: date) -> dict | None:
+    def search(self, origin: str, dest: str, day: date, back: date | None = None) -> dict | None:
         try:
-            self._page.goto(url(origin, dest, day), wait_until="domcontentloaded", timeout=60000)
+            self._page.goto(url(origin, dest, day, back), wait_until="domcontentloaded", timeout=60000)
             for _ in range(12):  # espera a lista de voos renderizar
                 self._page.wait_for_timeout(2500)
                 txt = self._page.inner_text("body")

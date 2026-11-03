@@ -30,10 +30,10 @@ DEFAULT = {
     "intervalo_horas": 3,           # de quanto em quanto tempo o radar de dinheiro roda
     "pares_por_rodada": 60,
     "silencio": {"inicio": 23, "fim": 7},   # sem avisos entre 23h e 7h (horario de Brasilia); null = desliga
-    "sensibilidade": 25,            # % abaixo do normal para avisar
+    "sensibilidade": 35,            # % abaixo do normal para avisar (so ofertas MUITO boas)
     "limites": {},                  # ex.: {"SCL": 1100}  (aviso se <= valor, em R$)
-    "milhas": {"ativo": True, "custo_milheiro": 16.0, "limites_milhas": {}, "sensibilidade": 25,
-               "buscas_por_rodada": 16, "descanso_horas": 3, "latam": False,
+    "milhas": {"ativo": True, "custo_milheiro": 16.0, "limites_milhas": {}, "sensibilidade": 35, "exigencia": 1.5, "latam": True,
+               "buscas_por_rodada": 16, "descanso_horas": 3,
                "passo_dias": 10, "duracoes": [7]},
     "regiao": "america_do_sul",
     # Escala "oculta": passagem ate um destino MAIS LONGE com conexao no hub, mais barata que ir ao hub.
@@ -44,6 +44,7 @@ DEFAULT = {
                   "PTY": ["MIA", "MEX", "SJO", "CUN"], "EZE": ["MAD", "FCO", "MIA"],
                   "MVD": ["MAD"], "GRU": []},
     },
+    "resumo_diario": False,         # True = 1 mensagem por dia com os menores valores (padrao: so ofertas realmente boas)
     "bot": {"chat_id": ""},
 }
 

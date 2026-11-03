@@ -20,7 +20,7 @@ import random
 import time
 from datetime import date, datetime, timedelta
 
-from . import config, dates, notify, store
+from . import config, dates, msg, notify, store
 from .airports import nome
 from .outlier import judge
 
@@ -47,34 +47,22 @@ def cash_reference(dest: str) -> float | None:
     return None
 
 
-def evaluate(m: dict, hist_sample: list, mc: dict, cash: float | None) -> str:
-    """Motivo do aviso ('' = sem oferta)."""
+def evaluate(m: dict, hist_sample: list, mc: dict, cash: float | None):
+    """(motivo, pct, rotulo) ou ('', None, '') quando NAO e uma oferta realmente boa."""
+    custo = mc["custo_milheiro"]
+    custo_milhas = m["milhas"] / 1000 * custo
     if cash:
-        vm = cash / m["milhas"] * 1000
-        m["valor_milha"], m["cash"] = vm, cash
-        if vm >= mc["custo_milheiro"] * 1.3:
-            return (f"milhas valem R$ {vm:.1f}/milheiro (você paga R$ {mc['custo_milheiro']:g}) "
-                    "contra o menor preço em dinheiro")
+        m["cash"] = cash
+        if cash / m["milhas"] * 1000 >= custo * mc.get("exigencia", 1.5):
+            pct = (cash - custo_milhas) / cash * 100
+            return ("As milhas saem bem mais baratas que o menor preço em dinheiro", pct, "mais barato que pagar em dinheiro")
     cap = mc["limites_milhas"].get(m["dest"])
     if cap and m["milhas"] <= cap:
-        return f"abaixo do seu limite ({mil(cap)} milhas)"
+        return f"Abaixo do seu limite ({mil(cap)} milhas)", None, ""
     v = judge(m["milhas"], hist_sample, mc["sensibilidade"], min_n=6)
-    return v.reason + " vs histórico da rota" if v.is_outlier else ""
-
-
-def fmt(m: dict, why: str) -> str:
-    """Formato parecido com o dos grupos: milhas (ou R$), datas, total."""
-    nl = chr(10)
-    half = f" ou {brl(m['cash'] / 2)} (dinheiro, aprox.)" if m.get("cash") else ""
-    L = [f"<b>SÃO PAULO ✈️ {nome(m['dest']).upper()}</b>",
-         f"Programa: {m['programa']} · Origem {m['origin']}", "",
-         f"Ida: 🛫{nl}✅ {mil(m['ida'])} milhas{half}", f"🗓️ {m['dep']:%d/%m/%y}", "",
-         f"Volta: 🛬{nl}✅ {mil(m['volta'])} milhas{half}", f"🗓️ {m['ret']:%d/%m/%y}", "",
-         f"<b>Total: {mil(m['milhas'])} milhas</b> + txs" + (f" (dinheiro: {brl(m['cash'])})" if m.get("cash") else "")]
-    if m.get("mm"):
-        L.append(f"Milhas+dinheiro (ida): {mil(m['mm'][0])} milhas + {brl(m['mm'][1])}")
-    L += [f"💡 {why}", "<i>Antes das taxas. Os preços mudam a qualquer instante; confirme no site.</i>"]
-    return nl.join(L)
+    if v.is_outlier:
+        return "Bem abaixo do normal de milhas dessa rota", v.drop_pct, "abaixo do normal"
+    return "", None, ""
 
 
 def run(dry: bool = False, force: bool = False, limit: int | None = None, latam: bool = False) -> int:
@@ -96,6 +84,7 @@ def run(dry: bool = False, force: bool = False, limit: int | None = None, latam:
     cfg_m = dict(cfg, passo_dias=mc.get("passo_dias", 10), duracoes=mc.get("duracoes", [7]))
     cfg_m["destinos"] = sorted(cfg["destinos"], key=lambda d: -(cash_reference(d) or 0))
     combos = dates.build_combos(cfg_m, date.today(), None)
+    random.Random(7).shuffle(combos)   # cobre destinos e datas variados a cada rodada
     n_comb = max(1, budget // 2)
     chunk, st["cursor"] = dates.pick(combos, int(st.get("cursor", 0)), n_comb)
     origens = cfg["origens"] or ["GRU"]
@@ -126,11 +115,11 @@ def run(dry: bool = False, force: bool = False, limit: int | None = None, latam:
             bucket = f"M|{dest}"
             m = {"origin": origin, "dest": dest, "dep": dep, "ret": ret, "ida": a, "volta": b, "milhas": a + b,
                  "mm": ida.get("milhas_mais_dinheiro"), "programa": "Smiles", "bucket": bucket}
-            why = evaluate(m, store.sample(st, bucket), mc, cash_reference(dest))
+            why, pct, lab = evaluate(m, store.sample(st, bucket), mc, cash_reference(dest))
             store.add_obs(st, bucket, m["milhas"], d=dep.isoformat(), r=ret.isoformat(), o=origin)
-            print(f"  {dest} {dep}->{ret}: {mil(m['milhas'])} milhas" + (f" | OFERTA: {why}" if why else ""))
+            print(f"  Smiles {dest} {dep}->{ret}: {mil(m['milhas'])} milhas" + (f" | OFERTA: {why}" if why else ""))
             if why and store.should_alert(st, f"M-{origin}-{dest}-{dep}-{ret}", m["milhas"]):
-                found.append((m, why))
+                found.append((m, why, pct, lab))
 
     if (latam or mc.get("latam")) and not blocked:
         from .sources import latam as L
@@ -138,23 +127,23 @@ def run(dry: bool = False, force: bool = False, limit: int | None = None, latam:
             for i, (dest, dep, dur) in enumerate(chunk[:max(1, n_comb // 2)]):
                 origin = origens[i % len(origens)]
                 ret = dep + timedelta(days=dur)
-                ida = lt.search(origin, dest, dep)
+                ida = lt.search(origin, dest, dep, back=ret)
                 time.sleep(random.uniform(25, 45))
-                volta = lt.search(dest, origin, ret) if ida else None
+                volta = lt.search(dest, origin, ret, back=ret + timedelta(days=dur)) if ida else None
                 time.sleep(random.uniform(25, 45))
                 if not ida or not volta:
                     continue
                 m = {"origin": origin, "dest": dest, "dep": dep, "ret": ret, "ida": ida["milhas"],
                      "volta": volta["milhas"], "milhas": ida["milhas"] + volta["milhas"],
-                     "mm": (ida["milhas"], ida["taxas"]), "programa": "LATAM Pass", "bucket": f"M|{dest}|latam"}
-                why = evaluate(m, store.sample(st, m["bucket"]), mc, cash_reference(dest))
+                     "taxas": ida["taxas"] + volta["taxas"], "programa": "LATAM Pass", "bucket": f"M|{dest}|latam"}
+                why, pct, lab = evaluate(m, store.sample(st, m["bucket"]), mc, cash_reference(dest))
                 store.add_obs(st, m["bucket"], m["milhas"], d=dep.isoformat(), r=ret.isoformat(), o=origin)
                 print(f"  LATAM {dest} {dep}->{ret}: {mil(m['milhas'])} milhas" + (f" | OFERTA: {why}" if why else ""))
                 if why and store.should_alert(st, f"L-{origin}-{dest}-{dep}-{ret}", m["milhas"]):
-                    found.append((m, why))
+                    found.append((m, why, pct, lab))
 
     quiet = config.in_quiet_hours(cfg)
-    texts = [fmt(m, w) for m, w in found]
+    texts = [msg.deal_milhas(m, w, mc["custo_milheiro"], pct, lab or "abaixo do normal") for m, w, pct, lab in found]
     if quiet:
         st.setdefault("pendentes", []).extend(texts)
     else:
