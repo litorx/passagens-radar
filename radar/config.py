@@ -27,6 +27,15 @@ DEFAULT = {
     "sensibilidade": 25,            # % abaixo do normal para avisar
     "limites": {},                  # ex.: {"SCL": 1100}  (aviso se <= valor, em R$)
     "milhas": {"ativo": True, "custo_milheiro": 16.0, "limites_milhas": {}, "sensibilidade": 25},
+    "regiao": "america_do_sul",
+    # Escala "oculta": passagem ate um destino MAIS LONGE com conexao no hub, mais barata que ir ao hub.
+    # Zona cinza: viola o contrato da companhia (so ida, so bagagem de mao). Desligue com /escala off.
+    "escala_oculta": {
+        "ativo": True, "min_economia_pct": 20, "por_rodada": 6,
+        "rotas": {"SCL": ["SYD", "AKL"], "LIM": ["CUZ", "MIA"], "BOG": ["CUN", "MEX", "MIA"],
+                  "PTY": ["MIA", "MEX", "SJO", "CUN"], "EZE": ["MAD", "FCO", "MIA"],
+                  "MVD": ["MAD"], "GRU": []},
+    },
     "bot": {"chat_id": ""},
 }
 
@@ -54,6 +63,19 @@ def save(cfg: dict, path: Path | None = None) -> None:
     path = path or DATA / "config.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def load_env() -> None:
+    """Carrega segredos locais (data_local/.env ou .env.local) para o PC; ignorados pelo git."""
+    for f in (LOCAL / ".env", ROOT / ".env.local"):
+        try:
+            for line in f.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    os.environ.setdefault(k.strip(), v.strip().strip('"'))
+        except FileNotFoundError:
+            pass
 
 
 def now_brt() -> datetime:

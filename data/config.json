@@ -49,6 +49,42 @@
     "limites_milhas": {},
     "sensibilidade": 25
   },
+  "regiao": "america_do_sul",
+  "escala_oculta": {
+    "ativo": true,
+    "min_economia_pct": 20,
+    "por_rodada": 6,
+    "rotas": {
+      "SCL": [
+        "SYD",
+        "AKL"
+      ],
+      "LIM": [
+        "CUZ",
+        "MIA"
+      ],
+      "BOG": [
+        "CUN",
+        "MEX",
+        "MIA"
+      ],
+      "PTY": [
+        "MIA",
+        "MEX",
+        "SJO",
+        "CUN"
+      ],
+      "EZE": [
+        "MAD",
+        "FCO",
+        "MIA"
+      ],
+      "MVD": [
+        "MAD"
+      ],
+      "GRU": []
+    }
+  },
   "bot": {
     "chat_id": ""
   }

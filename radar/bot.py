@@ -5,7 +5,7 @@ import copy
 import re
 from datetime import datetime
 
-from .airports import nome
+from .airports import REGIOES, nome, regiao
 
 AJUDA = """<b>Radar de passagens</b> — comandos:
 /status — como está tudo
@@ -14,6 +14,10 @@ AJUDA = """<b>Radar de passagens</b> — comandos:
 /pausar · /retomar
 
 <b>Destinos e origens</b>
+/regioes — regiões prontas (brasil, america_do_sul, america_central,
+   america_norte, europa, asia, africa, oceania, mundo)
+/regiao europa — troca TODOS os destinos pela região (aceita várias: /regiao europa asia)
+/regiao+ asia — acrescenta uma região
 /destinos — lista atual
 /add SCL LIM — adiciona destinos
 /remover SCL — remove
@@ -27,6 +31,11 @@ AJUDA = """<b>Radar de passagens</b> — comandos:
 /ate 2027-12-31 — data final desejada
 /duracoes 5 7 10 — dias de viagem testados
 /passo 3 — testa 1 data a cada 3 dias
+
+<b>Escala oculta (zona cinza)</b>
+/escala on|off — procura passagem para lugar MAIS LONGE com conexão num hub, mais barata que ir ao hub
+/escala+ SCL SYD AKL — hub SCL, destinos além: SYD e AKL · /escala- SCL — remove o hub
+/economiaescala 20 — só avisa se ≥ 20% mais barata
 
 <b>Milhas (no seu PC)</b>
 /milhas on|off
@@ -58,6 +67,45 @@ def apply(cfg: dict, text: str) -> tuple[dict, str]:
         if cmd == "/retomar":
             cfg["ativo"] = True
             return cfg, "▶️ Radar ligado."
+        if cmd == "/regioes":
+            return cfg, "Regiões: " + ", ".join(f"{k} ({len(v)})" for k, v in REGIOES.items())
+        if cmd in ("/regiao", "/regiao+"):
+            nomes = [regiao(x) for x in a]
+            if not a or None in nomes:
+                bad = [x for x, n in zip(a, nomes) if n is None]
+                return cfg, f"Região não encontrada: {', '.join(bad) or '?'}. Veja /regioes"
+            novos = [c for n in nomes for c in REGIOES[n]]
+            if cmd == "/regiao":
+                cfg["destinos"] = list(dict.fromkeys(novos))
+                cfg["regiao"] = "+".join(nomes)
+            else:
+                cfg["destinos"] = list(dict.fromkeys(cfg["destinos"] + novos))
+                cfg["regiao"] = "+".join(dict.fromkeys(cfg.get("regiao", "").split("+") + nomes)).strip("+")
+            return cfg, (f"🌍 Destinos: {len(cfg['destinos'])} ({cfg['regiao']}). Regiões grandes demoram mais para "
+                         "completar a volta; use /passo 5 ou /duracoes 7 para acelerar.")
+        if cmd == "/escala":
+            if a and a[0].lower() in ("on", "off"):
+                cfg["escala_oculta"]["ativo"] = a[0].lower() == "on"
+                return cfg, f"✅ Escala oculta: {'ligada' if cfg['escala_oculta']['ativo'] else 'desligada'}"
+            r = cfg["escala_oculta"]["rotas"]
+            return cfg, ("Escala oculta " + ("ligada" if cfg["escala_oculta"]["ativo"] else "desligada")
+                         + ":\n" + "\n".join(f"{h} → {', '.join(v) or '-'}" for h, v in r.items()))
+        if cmd == "/escala+":
+            hub, alems = a[0].upper(), _codes(a[1:])
+            if not alems:
+                return cfg, "Use: /escala+ SCL SYD AKL"
+            cur = cfg["escala_oculta"]["rotas"].setdefault(hub, [])
+            cfg["escala_oculta"]["rotas"][hub] = list(dict.fromkeys(cur + alems))
+            return cfg, f"✅ Hub {hub} → {', '.join(cfg['escala_oculta']['rotas'][hub])}"
+        if cmd == "/escala-":
+            cfg["escala_oculta"]["rotas"].pop(a[0].upper(), None)
+            return cfg, f"🗑️ Hub {a[0].upper()} removido."
+        if cmd == "/economiaescala":
+            p = float(a[0])
+            if not 5 <= p <= 80:
+                return cfg, "Escolha entre 5 e 80 (%)."
+            cfg["escala_oculta"]["min_economia_pct"] = p
+            return cfg, f"✅ Escala oculta só avisa se ≥ {p:g}% mais barata."
         if cmd == "/destinos":
             return cfg, "Destinos: " + ", ".join(f"{d} ({nome(d)})" for d in cfg["destinos"])
         if cmd == "/add":

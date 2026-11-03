@@ -74,6 +74,43 @@ class Bot(unittest.TestCase):
         self.assertFalse(c["ativo"])
 
 
+class Regioes(unittest.TestCase):
+    def setUp(self):
+        self.cfg = config.load(config.DATA / "nao_existe.json")
+
+    def test_replace_and_add(self):
+        c, r = bot.apply(self.cfg, "/regiao europa")
+        self.assertIn("LIS", c["destinos"])
+        self.assertNotIn("SCL", c["destinos"])
+        c, r = bot.apply(c, "/regiao+ asia")
+        self.assertIn("NRT", c["destinos"])
+        self.assertIn("LIS", c["destinos"])
+        c, r = bot.apply(c, "/regiao america do sul")  # varias palavras = regiao invalida
+        self.assertIn("nao encontrada" if False else "não encontrada", r)
+
+    def test_alias_and_unknown(self):
+        c, _ = bot.apply(self.cfg, "/regiao todos")
+        self.assertGreater(len(c["destinos"]), 100)
+        c2, r = bot.apply(self.cfg, "/regiao marte")
+        self.assertEqual(c2, self.cfg)
+
+    def test_escala_commands(self):
+        c, _ = bot.apply(self.cfg, "/escala+ LIS GRU JFK")
+        self.assertIn("JFK", c["escala_oculta"]["rotas"]["LIS"])
+        c, _ = bot.apply(c, "/escala off")
+        self.assertFalse(c["escala_oculta"]["ativo"])
+        c, _ = bot.apply(c, "/escala- LIS")
+        self.assertNotIn("LIS", c["escala_oculta"]["rotas"])
+
+
+class EscalaGrid(unittest.TestCase):
+    def test_grid_only_when_active(self):
+        cfg = config.load(config.DATA / "nao_existe.json")
+        self.assertTrue(dates.build_escala(cfg, date(2026, 11, 2)))
+        cfg["escala_oculta"]["ativo"] = False
+        self.assertEqual(dates.build_escala(cfg, date(2026, 11, 2)), [])
+
+
 class Quiet(unittest.TestCase):
     def test_overnight(self):
         cfg = dict(config.DEFAULT, silencio={"inicio": 23, "fim": 7})

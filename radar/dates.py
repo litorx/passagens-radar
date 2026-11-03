@@ -35,3 +35,20 @@ def pick(combos: list, cursor: int, n: int):
     cursor %= len(combos)
     idx = [(cursor + i) % len(combos) for i in range(min(n, len(combos)))]
     return [combos[i] for i in idx], (cursor + len(idx)) % len(combos)
+
+
+def build_escala(cfg: dict, today: date):
+    """(hub, alem, ida) para a busca de escala oculta. Datas mais espacadas (2x o passo)."""
+    e = cfg.get("escala_oculta", {})
+    if not e.get("ativo"):
+        return []
+    end = min(_d(cfg["ate"]), today + timedelta(days=SALE_HORIZON_DAYS))
+    step = max(1, int(cfg["passo_dias"])) * 2
+    out = []
+    for hub, alems in e.get("rotas", {}).items():
+        for alem in alems:
+            d = today + timedelta(days=int(cfg["antecedencia_min_dias"]))
+            while d <= end:
+                out.append((hub, alem, d))
+                d += timedelta(days=step)
+    return out

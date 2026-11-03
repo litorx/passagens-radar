@@ -63,6 +63,7 @@ def fmt(m: dict, rec: dict) -> str:
 
 
 def run(dry=False, force=False, limit=None, latam=False) -> int:
+    config.load_env()
     cfg = load_cfg()
     mc = cfg["milhas"]
     if not mc["ativo"] and not force:

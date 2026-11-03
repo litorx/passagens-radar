@@ -48,3 +48,43 @@ def fetch(origin: str, dest: str, dep: date, ret: date, retries: int = 2) -> Res
     if isinstance(last, (IndexError, TypeError, KeyError)):
         return Result(found=False)
     raise RuntimeError(f"fonte falhou: {type(last).__name__}")
+
+
+def _oneway_options(origin: str, dest: str, dep: date):
+    q = create_query(
+        flights=[FlightQuery(date=dep.isoformat(), from_airport=origin, to_airport=dest)],
+        trip="one-way", seat="economy", passengers=Passengers(adults=1),
+        language="pt-BR", currency="BRL")
+    for _ in range(2):
+        try:
+            return [r for r in get_flights(q) if getattr(r, "price", 0)]
+        except FlightsNotFound:
+            return []
+        except (IndexError, TypeError, KeyError):
+            time.sleep(random.uniform(1, 3))
+        except Exception:  # noqa: BLE001
+            time.sleep(random.uniform(2, 5))
+    return []
+
+
+def passes_through(option, via: str) -> bool:
+    """True se a opcao tem conexao (nao e o destino final) em `via`."""
+    segs = list(getattr(option, "flights", []) or [])
+    return any(getattr(getattr(sg, "to_airport", None), "code", "") == via for sg in segs[:-1])
+
+
+def fetch_oneway(origin: str, dest: str, dep: date) -> Result:
+    res = _oneway_options(origin, dest, dep)
+    if not res:
+        return Result(found=False)
+    b = min(res, key=lambda r: r.price)
+    return Result(int(b.price), list(b.airlines))
+
+
+def fetch_oneway_via(origin: str, beyond: str, dep: date, via: str) -> Result:
+    """Menor so-ida ate `beyond` cuja rota faz conexao em `via` (escala oculta)."""
+    res = [r for r in _oneway_options(origin, beyond, dep) if passes_through(r, via)]
+    if not res:
+        return Result(found=False)
+    b = min(res, key=lambda r: r.price)
+    return Result(int(b.price), list(b.airlines))

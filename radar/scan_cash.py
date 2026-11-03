@@ -30,6 +30,45 @@ def fmt_alert(origin, dest, dep, ret, price, airlines, why):
             f"<i>Preço de ida e volta, só bagagem de mão. Fonte: Google Flights.</i>")
 
 
+def fmt_escala(origin, hub, alem, dep, far, direct, eco):
+    link = notify.skyscanner_url(origin, alem, dep, dep).replace("rtn=1", "rtn=0")
+    return chr(10).join([
+        "🔴 <b>ESCALA OCULTA (zona cinza)</b>",
+        f"SP → {nome(alem)} com conexão em {nome(hub)}: <b>{brl(far.price)}</b> (só ida, {dep:%d/%m/%Y})",
+        f"Ir direto a {nome(hub)} custa {brl(direct.price)} → <b>{eco:.0f}% mais barato</b>",
+        f"Cia: {', '.join(far.airlines) or '?'}",
+        f"⚠️ Você desce na conexão ({hub}) e não usa o último trecho. Só bagagem de mão, só ida "
+        "(volta compre à parte), não use conta de milhas. A companhia pode cancelar o resto do bilhete.",
+        f"🔎 {link}",
+    ])
+
+
+def escala_step(cfg, st, today, origens, t0, max_minutes) -> list:
+    e = cfg.get("escala_oculta", {})
+    combos = dates.build_escala(cfg, today)
+    out = []
+    if not combos:
+        return out
+    chunk, st["cursor_escala"] = dates.pick(combos, int(st.get("cursor_escala", 0)), int(e.get("por_rodada", 6)))
+    for i, (hub, alem, dep) in enumerate(chunk):
+        if time.time() - t0 > max_minutes * 60:
+            break
+        origin = origens[i % len(origens)]
+        time.sleep(random.uniform(2.5, 5.5))
+        try:
+            direct = cash_google.fetch_oneway(origin, hub, dep)
+            far = cash_google.fetch_oneway_via(origin, alem, dep, hub)
+        except Exception as ex:  # noqa: BLE001
+            print("escala falhou:", ex, file=sys.stderr)
+            continue
+        if not (direct.found and far.found):
+            continue
+        eco = (direct.price - far.price) / direct.price * 100
+        if eco >= e.get("min_economia_pct", 20) and store.should_alert(st, f"E-{origin}-{hub}-{alem}-{dep}", far.price):
+            out.append(fmt_escala(origin, hub, alem, dep, far, direct, eco))
+    return out
+
+
 def run(dry: bool = False, force: bool = False, max_minutes: float = 25, limit: int | None = None) -> int:
     cfg = config.load()
     st = store.load(STATE)
@@ -87,6 +126,8 @@ def run(dry: bool = False, force: bool = False, max_minutes: float = 25, limit: 
         why = v.reason if v.is_outlier else (f"abaixo do seu limite ({brl(cap)})" if cap and r.price <= cap else "")
         if why and store.should_alert(st, f"{origin}-{dest}-{dep}-{ret}", r.price):
             alerts.append(fmt_alert(origin, dest, dep, ret, r.price, r.airlines, why))
+
+    alerts += escala_step(cfg, st, today, origens, t0, max_minutes)
 
     quiet = config.in_quiet_hours(cfg)
     pend = st.setdefault("pendentes", [])
