@@ -72,12 +72,19 @@ def top_text(n: int = 10) -> str:
 
 def dispatch_scan() -> str:
     repo, tok = os.environ.get("GITHUB_REPOSITORY"), os.environ.get("GITHUB_TOKEN")
-    if not repo or not tok:
-        return "Sem acesso ao GitHub para disparar (rode a Action 'scan' manualmente)."
-    r = requests.post(f"https://api.github.com/repos/{repo}/actions/workflows/scan.yml/dispatches",
-                      headers={"Authorization": f"Bearer {tok}", "Accept": "application/vnd.github+json"},
-                      json={"ref": "main", "inputs": {"force": "true"}}, timeout=20)
-    return "🔎 Varredura disparada. Pode levar uns minutos." if r.status_code in (201, 204) else f"Falhou ({r.status_code})."
+    if repo and tok:
+        r = requests.post(f"https://api.github.com/repos/{repo}/actions/workflows/scan.yml/dispatches",
+                          headers={"Authorization": f"Bearer {tok}", "Accept": "application/vnd.github+json"},
+                          json={"ref": "main", "inputs": {"force": "true"}}, timeout=20)
+        ok = r.status_code in (201, 204)
+    else:  # rodando no PC: usa o gh ja autenticado
+        import subprocess
+        try:
+            ok = subprocess.run(["gh", "workflow", "run", "scan.yml", "-f", "force=true"], cwd=config.ROOT,
+                                capture_output=True, timeout=60).returncode == 0
+        except Exception:  # noqa: BLE001
+            ok = False
+    return "🔎 Varredura disparada. Leva uns 5 minutos." if ok else "Não consegui disparar; rode a Action 'scan' manualmente."
 
 
 def main() -> int:

@@ -83,6 +83,8 @@ def run(dry: bool = False, force: bool = False, limit_dest: int | None = None, m
         print("ainda nao e hora (intervalo_horas)")
         return 0
 
+    for b in [b for b in st.get("obs", {}) if not b.startswith("K|")]:   # historico antigo (Google) nao serve mais
+        del st["obs"][b]
     p = kiwi.plan(cfg)
     if not p:
         notify.tg_send("⚠️ Período inválido: a janela é menor que a estadia mínima. Use /periodo ou /duracoes.", cid, dry)

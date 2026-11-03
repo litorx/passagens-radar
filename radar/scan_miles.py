@@ -38,14 +38,16 @@ def load_cfg() -> dict:
     return config.load()
 
 
-def cash_reference(dest: str, month: str) -> float | None:
-    """Mediana de dinheiro (do radar de nuvem, se estiver baixado) para comparar o valor da milha."""
+def cash_reference(dest: str, month: str = "") -> float | None:
+    """Menor valor em DINHEIRO do periodo (Kiwi, data/top.json): referencia conservadora para o valor da milha."""
     try:
-        st = json.loads(CASH_STATE.read_text(encoding="utf-8"))
-        vals = [o["p"] for o in st.get("obs", {}).get(f"{dest}|{month}", [])]
-        return sorted(vals)[len(vals) // 2] if len(vals) >= 5 else None
+        t = json.loads((config.DATA / "top.json").read_text(encoding="utf-8"))
+        for r in t.get("top", []):
+            if r["dest"] == dest:
+                return float(r["total"])
     except Exception:  # noqa: BLE001
-        return None
+        pass
+    return None
 
 
 def fmt(m: dict, rec: dict) -> str:
@@ -56,7 +58,7 @@ def fmt(m: dict, rec: dict) -> str:
         lines.append(f"Milhas+dinheiro (ida): {m['mm'][0]:,} milhas + R$ {m['mm'][1]:,.0f}".replace(",", "."))
     if rec.get("valor"):
         lines.append(f"💡 Valor da milha ≈ R$ {rec['valor']:.1f}/milheiro "
-                     f"(você paga R$ {rec['custo']:g}) vs dinheiro mediano R$ {rec['cash']:,.0f}".replace(",", "."))
+                     f"(você paga R$ {rec['custo']:g}) vs menor preço em dinheiro R$ {rec['cash']:,.0f}".replace(",", "."))
     lines.append(f"📉 {rec['why']}")
     lines.append("<i>Antes das taxas. Confira e emita no site oficial.</i>")
     return "\n".join(lines)
@@ -85,9 +87,11 @@ def run(dry=False, force=False, limit=None, latam=False) -> int:
             volta = sm.search(dest, origin, ret)
             time.sleep(random.uniform(3, 6))
             if not ida or not volta:
+                print(f"  sem leitura {origin}->{dest} {dep} (ida={'ok' if ida else 'nao'}, volta={'ok' if volta else 'nao'})")
                 continue
             a, b = ida.get("milhas_direto") or ida.get("milhas_min"), volta.get("milhas_direto") or volta.get("milhas_min")
             if not a or not b:
+                print(f"  sem milhas {origin}<->{dest} {dep}")
                 continue
             tot = a + b
             bucket = f"{dest}|{dep:%Y-%m}"
