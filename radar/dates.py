@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
-SALE_HORIZON_DAYS = 360  # teto de seguranca; o horizonte real e descoberto por destino
+SALE_HORIZON_DAYS = 345  # medido em 02/11/2026: ha preco ate ~330 dias, nenhum voo a partir de ~347
 
 
 def _d(s) -> date:
@@ -11,17 +11,19 @@ def _d(s) -> date:
 
 
 def build_combos(cfg: dict, today: date, horizon: dict | None = None):
+    """Grade (destino, ida, duracao). O horizonte de vendas (~345 dias, medido) so cresce quando
+    alguma data alem dele passa a ter preco (calendario abriu); nunca encolhe por amostragem parcial."""
     horizon = horizon or {}
-    end = min(_d(cfg["ate"]), today + timedelta(days=SALE_HORIZON_DAYS))
+    lim = SALE_HORIZON_DAYS
+    for h in horizon.values():
+        lim = max(lim, (_d(h) - today).days + 14)
+    end = min(_d(cfg["ate"]), today + timedelta(days=lim))
     start = today + timedelta(days=int(cfg["antecedencia_min_dias"]))
     step = max(1, int(cfg["passo_dias"]))
     combos = []
     for dest in cfg["destinos"]:
-        h = horizon.get(dest)
-        # alem do horizonte conhecido so sonda 2 passos (para detectar abertura de datas novas)
-        limit = min(end, _d(h) + timedelta(days=step * 2)) if h else end
         d = start
-        while d <= limit:
+        while d <= end:
             for n in cfg["duracoes"]:
                 combos.append((dest, d, int(n)))
             d += timedelta(days=step)

@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 HIST_KEEP_DAYS = 120
-MAX_PER_BUCKET = 400
+MAX_PER_BUCKET = 150
 
 
 def load(path: Path) -> dict:

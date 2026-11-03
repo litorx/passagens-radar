@@ -113,11 +113,10 @@ def run(dry: bool = False, force: bool = False, max_minutes: float = 25, limit: 
         results.append((origin, dest, dep, ret, r, bucket))
         h = horizon.get(dest)
         if h is None or dep.isoformat() > h:
-            old = h
             horizon[dest] = dep.isoformat()
-            if old and (dep - date.fromisoformat(old)).days >= 7:
+            if (dep - today).days > dates.SALE_HORIZON_DAYS:   # datas alem do horizonte conhecido: abriu!
                 st.setdefault("novidades", []).append(
-                    f"🆕 Calendário abriu: {nome(dest)} agora até {dep:%d/%m/%Y}")
+                    f"🆕 Calendário abriu: {nome(dest)} já tem preço até {dep:%d/%m/%Y}")
 
     alerts = []
     for origin, dest, dep, ret, r, bucket in results:

@@ -18,42 +18,28 @@ funciona com **Chrome real + Playwright em janela visível** (modo invisível é
 (`GAHLicita/Buscador-de-passagens`) documenta que a Smiles bloqueia os servidores do GitHub. Por isso a janela abre
 **fora da tela** (-32000) e o PC precisa estar ligado e logado. A LATAM exige login: você entra uma vez num perfil local.
 
-## Instalação (≈10 min)
+## Instalação (já feita para o bot @PassagensPintinhobot; refaça só se quiser um novo)
+1. **Telegram:** @BotFather → `/newbot` → token.  2. **GitHub:** `gh repo create passagens-radar --public --source . --push`
+   e `gh secret set TELEGRAM_BOT_TOKEN`.  3. Mande `/start` ao bot; descubra seu chat id (o bot responde em até 5 min,
+   ou abra `https://api.telegram.org/bot<TOKEN>/getUpdates`) e `gh secret set TELEGRAM_CHAT_ID --body <id>`.
+4. **PC (milhas):** crie `data_local/.env` com `TELEGRAM_BOT_TOKEN=...`, `TELEGRAM_CHAT_ID=...`,
+   `CONFIG_URL=https://raw.githubusercontent.com/<usuario>/passagens-radar/main/data/config.json`; depois
+   `pip install -r requirements-local.txt` e `.\windows\instalar_tarefa.ps1`. LATAM (opcional): `python -m radar.sources.latam --login`.
+> **Repositório público** de propósito (Actions ilimitado e grátis). Ficam visíveis só rotas e preços; token e chat id ficam em
+> *Secrets* / `data_local/.env` (ignorado pelo git). **Se o token vazar, gere outro no @BotFather (`/revoke`) e troque o Secret.**
 
-### 1. Crie o bot do Telegram
-No Telegram, converse com **@BotFather** → `/newbot` → escolha nome → copie o **token**.
-Depois abra seu bot e mande `/start`.
+## Mudar o destino para qualquer continente (pelo celular)
+`/regioes` lista: `brasil`, `america_do_sul`, `america_central`, `america_norte`, `europa`, `asia`, `africa`, `oceania`, `mundo`.
+- `/regiao europa` troca TODOS os destinos por Europa · `/regiao europa asia` combina · `/regiao+ africa` acrescenta.
+- `/add JFK` ou `/remover LIS` ajustam aeroporto a aeroporto. Origem é sempre **SP (GRU, CGH, VCP)**; mude com `/origens`.
+- Regiões grandes demoram mais para dar a volta: use `/passo 5` e `/duracoes 7` para varrer mais rápido.
 
-### 2. Publique no GitHub (PowerShell, na pasta do projeto)
-```powershell
-cd C:\Users\VitorX\passagens-radar
-gh repo create passagens-radar --public --source . --push
-gh secret set TELEGRAM_BOT_TOKEN          # cole o token do BotFather
-gh workflow run bot.yml                   # acelera o pareamento (ou espere ≤ 5 min)
-```
-> **Repositório público** de propósito: Actions é ilimitado e gratuito em repo público. O que fica visível são só rotas e
-> preços (nada pessoal). Token e chat id ficam em *Secrets* (nunca no código). Se preferir privado, aumente `/intervalo`
-> e confira o limite de 2.000 min/mês do plano grátis.
-
-### 3. Pareie o seu chat
-Em até 5 min o bot responde ao seu `/start` com **"Seu chat id é 123456789"**. Então:
-```powershell
-gh secret set TELEGRAM_CHAT_ID --body 123456789
-gh workflow run scan.yml -f force=true    # primeira varredura agora
-```
-Mande `/status` no Telegram. Pronto: só o **seu** chat obedece.
-
-### 4. (Opcional, recomendado) Milhas no seu PC
-```powershell
-pip install -r requirements-local.txt
-setx TELEGRAM_BOT_TOKEN "SEU_TOKEN"
-setx TELEGRAM_CHAT_ID "123456789"
-setx CONFIG_URL "https://raw.githubusercontent.com/SEU_USUARIO/passagens-radar/main/data/config.json"
-python -m radar.sources.latam --login      # entra na LATAM uma vez (opcional)
-python -m radar.scan_miles --force --limit 2 --dry   # teste (nao envia)
-.\windows\instalar_tarefa.ps1              # agenda a cada 2 h
-```
-(Feche e reabra o terminal depois do `setx`.) Para incluir LATAM: edite a tarefa para `-m radar.scan_miles --latam`.
+## Escala oculta (voos com conexão para lugares mais longe)
+O radar também compara, para cada **hub** configurado, o preço **só ida até um destino mais longe com conexão no hub** contra
+o preço de **ir só até o hub**. Se for ≥ 20 % mais barato, avisa com 🔴. **Zona cinza:** é "hidden city": viola o contrato da
+companhia (só bagagem de mão, só ida, não use conta de milhas; o resto do bilhete pode ser cancelado).
+`/escala on|off` · `/escala+ SCL SYD AKL` (hub e destinos além) · `/escala- SCL` · `/economiaescala 20`.
+(Voos com conexão até o PRÓPRIO destino já entram na busca normal: o preço é o menor entre todas as opções.)
 
 ## Comandos do celular
 `/ajuda` lista todos. Os principais:

@@ -1,5 +1,5 @@
 import unittest
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from radar import bot, config, dates, outlier, store
 from radar.sources import latam, smiles
@@ -27,12 +27,14 @@ class Dates(unittest.TestCase):
     def test_window_and_steps(self):
         c = dates.build_combos(self.cfg, date(2026, 11, 2), {})
         self.assertEqual(c[0][1], date(2026, 11, 9))
-        self.assertTrue(all(x[1] <= date(2027, 10, 28) for x in c))  # teto de 360 dias
+        self.assertTrue(all(x[1] <= date(2026, 11, 2) + timedelta(days=345) for x in c))
 
-    def test_horizon_limits_probe(self):
-        c = dates.build_combos(self.cfg, date(2026, 11, 2), {"SCL": "2027-09-20"})
-        scl = [x for x in c if x[0] == "SCL"]
-        self.assertLessEqual(max(x[1] for x in scl), date(2027, 9, 26))
+    def test_horizon_only_grows_when_calendar_opens(self):
+        base = max(x[1] for x in dates.build_combos(self.cfg, date(2026, 11, 2), {}))
+        same = max(x[1] for x in dates.build_combos(self.cfg, date(2026, 11, 2), {"SCL": "2027-01-03"}))
+        self.assertEqual(base, same)  # amostragem parcial NAO encolhe a grade
+        grown = max(x[1] for x in dates.build_combos(self.cfg, date(2026, 11, 2), {"SCL": "2027-11-05"}))
+        self.assertGreater(grown, base)  # data alem do horizonte => grade se estende
 
     def test_cursor_rotates_and_wraps(self):
         a, cur = dates.pick(list(range(10)), 8, 4)
