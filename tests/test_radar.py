@@ -2,7 +2,7 @@ import unittest
 from datetime import date, datetime, timedelta
 
 from radar import bot, config, dates, outlier, store
-from radar.sources import latam, smiles
+from radar.sources import kiwi, latam, smiles
 
 
 class Outlier(unittest.TestCase):
@@ -111,6 +111,79 @@ class EscalaGrid(unittest.TestCase):
         self.assertTrue(dates.build_escala(cfg, date(2026, 11, 2)))
         cfg["escala_oculta"]["ativo"] = False
         self.assertEqual(dates.build_escala(cfg, date(2026, 11, 2)), [])
+
+
+class Periodo(unittest.TestCase):
+    T = date(2026, 11, 3)
+
+    def cfg(self, **kw):
+        return dict(config.DEFAULT, **kw)
+
+    def test_parse_formats(self):
+        self.assertEqual(config.parse_data("31/12/2026"), date(2026, 12, 31))
+        self.assertEqual(config.parse_data("dez/2026", False), date(2026, 12, 1))
+        self.assertEqual(config.parse_data("dez/2027", True), date(2027, 12, 31))
+        self.assertEqual(config.parse_data("12/2027", True), date(2027, 12, 31))
+        with self.assertRaises(ValueError):
+            config.parse_data("abc")
+
+    def test_command_short_window(self):
+        c, r = bot.apply(config.load(config.DATA / "x.json"), "/periodo 31/12/2026 05/01/2027")
+        self.assertEqual((c["de"], c["ate"]), ("2026-12-31", "2027-01-05"))
+        self.assertIn("TODAS", r)
+
+    def test_command_long_window_and_hoje(self):
+        c, r = bot.apply(config.load(config.DATA / "x.json"), "/periodo hoje dez/2027")
+        self.assertEqual((c["de"], c["ate"]), ("hoje", "2027-12-31"))
+        c, r = bot.apply(c, "/periodo dez/2026 ate dez/2027")
+        self.assertEqual((c["de"], c["ate"]), ("2026-12-01", "2027-12-31"))
+
+    def test_command_bad_period(self):
+        base = config.load(config.DATA / "x.json")
+        for t in ["/periodo", "/periodo 05/01/2027 31/12/2026", "/periodo foo bar"]:
+            c, _ = bot.apply(base, t)
+            self.assertEqual(c, base, t)
+
+    def test_kiwi_plan_short_and_long(self):
+        p = kiwi.plan(self.cfg(de="2026-12-31", ate="2027-01-05"), self.T)
+        self.assertTrue(p["short"])
+        self.assertEqual((p["nmin"], p["nmax"]), (2, 5))
+        a = kiwi.window_args(p)
+        self.assertEqual((a["departureDate"], a["departureDateTo"]), ("31/12/2026", "03/01/2027"))
+        self.assertEqual((a["returnDate"], a["returnDateTo"]), ("02/01/2027", "05/01/2027"))
+        p = kiwi.plan(self.cfg(de="hoje", ate="2027-12-31"), self.T)
+        self.assertFalse(p["short"])
+        self.assertEqual((p["nmin"], p["nmax"]), (5, 10))
+
+    def test_kiwi_plan_impossible(self):
+        self.assertIsNone(kiwi.plan(self.cfg(de="2027-01-01", ate="2027-01-01", estadia_min=3), self.T))
+
+    def test_bagagem_param(self):
+        p = kiwi.plan(self.cfg(), self.T)
+        self.assertEqual(kiwi.window_args(p, "despachada")["adults_hold_bags"], [1])
+        self.assertNotIn("adults_hold_bags", kiwi.window_args(p, "mao"))
+
+    def test_month_windows_rotate(self):
+        p = kiwi.plan(self.cfg(de="2026-12-01", ate="2027-03-31"), self.T)
+        w0 = kiwi.month_windows(p, 2, 0)
+        w1 = kiwi.month_windows(p, 2, 1)
+        self.assertEqual(len(w0), 2)
+        self.assertNotEqual(w0[0]["ini"], w1[0]["ini"])
+
+    def test_kiwi_rows_sorted_and_baggage(self):
+        data = {"itineraries": [
+            {"price": 1500, "bookingUrl": "u2", "baggage": {"checkedBag": 1},
+             "outbound": {"from": "GRU", "to": "LIM", "departureTime": "2027-02-20T19:25:00", "stops": 0, "route": ["GRU", "LIM"],
+                          "segments": [{"carrierName": "Sky Airline"}]},
+             "inbound": {"departureTime": "2027-03-01T11:20:00", "stops": 0, "segments": [{"carrierName": "Sky Airline"}]}},
+            {"price": 1402, "bookingUrl": "u1", "baggage": {"personalItem": 1},
+             "outbound": {"from": "GRU", "to": "LIM", "departureTime": "2027-02-21T19:25:00", "stops": 0, "route": ["GRU", "LIM"],
+                          "segments": [{"carrierName": "Sky Airline"}]},
+             "inbound": {"departureTime": "2027-03-01T11:20:00", "stops": 0, "segments": []}}]}
+        r = kiwi.rows(data)
+        self.assertEqual([x["total"] for x in r], [1402.0, 1500.0])
+        self.assertEqual(r[0]["dep"], "2027-02-21")
+        self.assertEqual(r[0]["url"], "u1")
 
 
 class Quiet(unittest.TestCase):

@@ -1,4 +1,4 @@
-name: scan (radar de dinheiro)
+name: scan (radar Kiwi)
 # Roda de hora em hora; o proprio radar decide se ja e hora de varrer
 # (config "intervalo_horas", mudavel pelo celular com /intervalo).
 on:
@@ -18,7 +18,7 @@ concurrency:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -33,12 +33,13 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           FORCE: ${{ inputs.force == true && '1' || '0' }}
-        run: python -m radar.scan_cash
+        run: |
+          if [ "$FORCE" = "1" ]; then python -m radar.scan --force; else python -m radar.scan; fi
       - name: Salvar estado
         run: |
           git config user.name "radar-bot"
           git config user.email "radar-bot@users.noreply.github.com"
-          git add data/state.json || true
+          git add data/state.json data/top.json || true
           git diff --cached --quiet && exit 0
           git commit -m "estado [skip ci]"
           for i in 1 2 3 4; do git pull --rebase -X theirs && git push && exit 0; sleep 5; done

@@ -5,12 +5,16 @@ import copy
 import re
 from datetime import datetime
 
+from . import config
 from .airports import REGIOES, nome, regiao
 
 AJUDA = """<b>Radar de passagens</b> — comandos:
+/top — os menores valores encontrados agora (no período)
+/periodo 31/12/2026 05/01/2027 — só essa janela (testa TODAS as combinações de ida e volta)
+/periodo dez/2026 dez/2027 — janela longa · /periodo hoje dez/2027
 /status — como está tudo
 /ultimos — últimos avisos
-/agora — rodar uma varredura agora
+/agora — varrer agora (leva uns minutos)
 /pausar · /retomar
 
 <b>Destinos e origens</b>
@@ -27,9 +31,11 @@ AJUDA = """<b>Radar de passagens</b> — comandos:
 /intervalo 2 — varre a cada 2 h
 /silencio 23 7 — sem avisos das 23h às 7h · /silencio off
 /sensibilidade 30 — avisa se ≥30% abaixo do normal
+/bagagem mao|despachada — preços só com item pessoal ou já com 1 mala
+/autotransferencia on|off — aceitar bilhetes separados combinados (mais barato, mais risco)
 /limite SCL 1100 — avisa se ≤ R$ 1.100 · /limite SCL off
 /ate 2027-12-31 — data final desejada
-/duracoes 5 7 10 — dias de viagem testados
+/duracoes 5 7 10 — dias de viagem testados (janela longa) · também 3-10
 /passo 3 — testa 1 data a cada 3 dias
 
 <b>Escala oculta (zona cinza)</b>
@@ -67,6 +73,32 @@ def apply(cfg: dict, text: str) -> tuple[dict, str]:
         if cmd == "/retomar":
             cfg["ativo"] = True
             return cfg, "▶️ Radar ligado."
+        if cmd == "/periodo":
+            toks = [x for x in a if x.lower() not in ("ate", "até", "a", "-", "ao")]
+            if len(toks) != 2:
+                return cfg, "Use: /periodo 31/12/2026 05/01/2027 · /periodo dez/2026 dez/2027 · /periodo hoje dez/2027"
+            d0 = config.parse_data(toks[0], False)
+            d1 = config.parse_data(toks[1], True)
+            if d1 < d0:
+                return cfg, "A data final é antes da inicial."
+            cfg["de"] = "hoje" if toks[0].lower() in ("hoje", "agora") else d0.isoformat()
+            cfg["ate"] = d1.isoformat()
+            dias = (d1 - d0).days
+            modo = ("Janela curta: testo TODAS as combinações de ida e volta dentro dela."
+                    if dias <= 21 else f"Janela longa: testo viagens de {cfg['duracoes']} dias (/duracoes muda).")
+            return cfg, f"📅 Período: {d0:%d/%m/%Y} → {d1:%d/%m/%Y} ({dias} dias). {modo}"
+        if cmd == "/autotransferencia":
+            on = a[0].lower() in ("on", "sim", "1")
+            cfg["autotransferencia"] = on
+            return cfg, ("⚠️ Aceita bilhetes SEPARADOS combinados (mais barato, mas se o 1º voo atrasar a 2ª companhia "
+                         "não te realoca)." if on else "🛡️ Só itinerários em um bilhete único (sem autotransferência).")
+        if cmd == "/bagagem":
+            v = a[0].lower()
+            if v not in ("mao", "mão", "despachada"):
+                return cfg, "Use: /bagagem mao  ou  /bagagem despachada"
+            cfg["bagagem"] = "despachada" if v == "despachada" else "mao"
+            return cfg, ("🧳 Preços já com 1 mala despachada." if cfg["bagagem"] == "despachada"
+                         else "🎒 Preços só com item pessoal (mais baixos; mala é cobrada à parte).")
         if cmd == "/regioes":
             return cfg, "Regiões: " + ", ".join(f"{k} ({len(v)})" for k, v in REGIOES.items())
         if cmd in ("/regiao", "/regiao+"):
@@ -160,7 +192,14 @@ def apply(cfg: dict, text: str) -> tuple[dict, str]:
             return cfg, (f"✅ Janela até {a[0]}. As companhias só vendem ~11 meses à frente; "
                          "o radar descobre o limite sozinho e avisa quando novas datas abrem.")
         if cmd == "/duracoes":
-            ds = [int(x) for x in a if x.isdigit() and 1 <= int(x) <= 60]
+            ds = []
+            for x in a:
+                if "-" in x:
+                    lo, hi = x.split("-", 1)
+                    ds += [n for n in range(int(lo), int(hi) + 1) if 1 <= n <= 60]
+                elif x.isdigit() and 1 <= int(x) <= 60:
+                    ds.append(int(x))
+            ds = sorted(set(ds))
             if not ds:
                 return cfg, "Use: /duracoes 5 7 10"
             cfg["duracoes"] = ds

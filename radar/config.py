@@ -17,8 +17,14 @@ DEFAULT = {
     "origens": ["GRU", "CGH", "VCP"],
     "destinos": ["SCL", "EZE", "AEP", "MVD", "LIM", "ASU", "COR", "MDZ", "BOG", "MDE",
                  "CTG", "UIO", "CUZ", "LPB", "VVI", "PTY", "BRC", "USH", "FTE", "PUQ"],
-    "ate": "2027-12-31",            # data final desejada (o radar ve ate onde as cias vendem)
-    "antecedencia_min_dias": 7,
+    "de": "hoje",                   # inicio do periodo ("hoje" ou data)
+    "ate": "2027-12-31",            # fim do periodo (o radar ve ate onde as cias vendem)
+    "estadia_min": 2,               # minimo de dias de viagem (janelas curtas testam TODAS as combinacoes)
+    "antecedencia_min_dias": 7,     # so vale quando "de" = "hoje"
+    "destinos_por_rodada": 20,
+    "bagagem": "mao",               # mao (so item pessoal) | despachada (preco ja com 1 mala)
+    "autotransferencia": False,     # True = aceita bilhetes SEPARADOS combinados (mais barato, risco de perder conexao)
+    "amostra_meses": 3,             # meses sorteados por destino p/ medir o normal do periodo
     "passo_dias": 3,                # testa 1 data a cada N dias
     "duracoes": [5, 7, 10],
     "intervalo_horas": 3,           # de quanto em quanto tempo o radar de dinheiro roda
@@ -76,6 +82,50 @@ def load_env() -> None:
                     os.environ.setdefault(k.strip(), v.strip().strip('"'))
         except FileNotFoundError:
             pass
+
+
+_MESES = {"jan": 1, "fev": 2, "mar": 3, "abr": 4, "mai": 5, "jun": 6, "jul": 7, "ago": 8, "set": 9,
+          "out": 10, "nov": 11, "dez": 12}
+
+
+def parse_data(txt: str, fim: bool = False, today=None):
+    """'hoje', 2026-12-31, 31/12/2026, 12/2026, dez/2026, dez2026 -> date (mes sozinho: 1o ou ultimo dia)."""
+    import calendar
+    import re
+    from datetime import date
+    t = (txt or "").strip().lower()
+    today = today or date.today()
+    if t in ("hoje", "agora"):
+        return today
+    m = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", t)
+    if m:
+        return date(int(m[1]), int(m[2]), int(m[3]))
+    m = re.fullmatch(r"(\d{1,2})/(\d{1,2})/(\d{4})", t)
+    if m:
+        return date(int(m[3]), int(m[2]), int(m[1]))
+    mo = ye = None
+    m = re.fullmatch(r"(\d{1,2})/(\d{4})", t)
+    if m:
+        mo, ye = int(m[1]), int(m[2])
+    m = re.fullmatch(r"([a-zç]{3})[a-z]*[/\- ]?(\d{4})", t)
+    if m and m[1] in _MESES:
+        mo, ye = _MESES[m[1]], int(m[2])
+    if mo and 1 <= mo <= 12:
+        return date(ye, mo, calendar.monthrange(ye, mo)[1] if fim else 1)
+    raise ValueError(f"data invalida: {txt}")
+
+
+def janela(cfg: dict, today=None):
+    """(inicio, fim) do periodo. 'hoje' respeita a antecedencia minima; data explicita vale como esta."""
+    from datetime import date, timedelta
+    today = today or date.today()
+    de_txt = str(cfg.get("de", "hoje"))
+    if de_txt.strip().lower() in ("hoje", "agora", ""):
+        ini = today + timedelta(days=int(cfg.get("antecedencia_min_dias", 7)))
+    else:
+        ini = max(parse_data(de_txt, False, today), today + timedelta(days=1))
+    fim = parse_data(str(cfg["ate"]), True, today)
+    return ini, fim
 
 
 def now_brt() -> datetime:

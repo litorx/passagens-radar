@@ -1,4 +1,2 @@
 playwright
 requests
-fast-flights>=3.1.0
-typing_extensions

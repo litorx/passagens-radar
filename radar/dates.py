@@ -17,8 +17,9 @@ def build_combos(cfg: dict, today: date, horizon: dict | None = None):
     lim = SALE_HORIZON_DAYS
     for h in horizon.values():
         lim = max(lim, (_d(h) - today).days + 14)
-    end = min(_d(cfg["ate"]), today + timedelta(days=lim))
-    start = today + timedelta(days=int(cfg["antecedencia_min_dias"]))
+    from . import config
+    start, fim = config.janela(cfg, today)
+    end = min(fim, today + timedelta(days=lim))
     step = max(1, int(cfg["passo_dias"]))
     combos = []
     for dest in cfg["destinos"]:

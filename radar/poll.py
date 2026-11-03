@@ -45,6 +45,31 @@ def status_text(cfg: dict) -> str:
     return "\n".join(linhas)
 
 
+TOPF = config.DATA / "top.json"
+
+
+def top_text(n: int = 10) -> str:
+    try:
+        t = json.loads(TOPF.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return "Ainda sem resultados. Mande /agora para varrer."
+    rows = t.get("top", [])[:n]
+    if not rows:
+        return "Nenhuma combinação no período atual."
+    from datetime import date as _d
+    f = lambda x: f"R$ {int(x):,}".replace(",", ".")  # noqa: E731
+    L = [f"🏆 Menores valores ({_d.fromisoformat(t['de']):%d/%m/%Y} → {_d.fromisoformat(t['ate']):%d/%m/%Y}), "
+         f"{t['cobertos']}/{t['destinos']} destinos cobertos, bagagem: {t.get('bagagem', 'mao')}:"]
+    for r in rows:
+        a = _d.fromisoformat(r["dep"])
+        b = _d.fromisoformat(r["ret"]) if r.get("ret") else None
+        quando = f"{a:%d/%m}→{b:%d/%m}" if b else f"{a:%d/%m}"
+        con = "direto" if r.get("stops", 0) == 0 else f"{r['stops']} conexão"
+        L.append(f"• {nome(r['dest'])}: <b>{f(r['total'])}</b> · {quando} · {con} · {', '.join(r.get('air', []))}")
+    L.append(f"Atualizado em {t['last_run']} UTC (Kiwi.com). /top 20 mostra mais.")
+    return chr(10).join(L)
+
+
 def dispatch_scan() -> str:
     repo, tok = os.environ.get("GITHUB_REPOSITORY"), os.environ.get("GITHUB_TOKEN")
     if not repo or not tok:
@@ -88,6 +113,9 @@ def main() -> int:
         elif cmd == "/ultimos":
             rec = store.load(STATE).get("recentes", [])[-8:]
             reply = "\n\n".join(r["txt"] for r in rec) or "Nenhum aviso ainda."
+        elif cmd == "/top":
+            nn = int(text.split()[1]) if len(text.split()) > 1 and text.split()[1].isdigit() else 10
+            reply = top_text(min(nn, 25))
         elif cmd == "/agora":
             reply = dispatch_scan()
         else:

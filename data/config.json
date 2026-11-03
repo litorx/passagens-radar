@@ -27,8 +27,14 @@
     "FTE",
     "PUQ"
   ],
+  "de": "hoje",
   "ate": "2027-12-31",
+  "estadia_min": 2,
   "antecedencia_min_dias": 7,
+  "destinos_por_rodada": 20,
+  "bagagem": "mao",
+  "autotransferencia": false,
+  "amostra_meses": 3,
   "passo_dias": 3,
   "duracoes": [
     5,
