@@ -53,7 +53,14 @@
     "ativo": true,
     "custo_milheiro": 16.0,
     "limites_milhas": {},
-    "sensibilidade": 25
+    "sensibilidade": 25,
+    "buscas_por_rodada": 16,
+    "descanso_horas": 3,
+    "latam": false,
+    "passo_dias": 10,
+    "duracoes": [
+      7
+    ]
   },
   "regiao": "america_do_sul",
   "escala_oculta": {

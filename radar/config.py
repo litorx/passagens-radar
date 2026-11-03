@@ -32,7 +32,9 @@ DEFAULT = {
     "silencio": {"inicio": 23, "fim": 7},   # sem avisos entre 23h e 7h (horario de Brasilia); null = desliga
     "sensibilidade": 25,            # % abaixo do normal para avisar
     "limites": {},                  # ex.: {"SCL": 1100}  (aviso se <= valor, em R$)
-    "milhas": {"ativo": True, "custo_milheiro": 16.0, "limites_milhas": {}, "sensibilidade": 25},
+    "milhas": {"ativo": True, "custo_milheiro": 16.0, "limites_milhas": {}, "sensibilidade": 25,
+               "buscas_por_rodada": 16, "descanso_horas": 3, "latam": False,
+               "passo_dias": 10, "duracoes": [7]},
     "regiao": "america_do_sul",
     # Escala "oculta": passagem ate um destino MAIS LONGE com conexao no hub, mais barata que ir ao hub.
     # Zona cinza: viola o contrato da companhia (so ida, so bagagem de mao). Desligue com /escala off.

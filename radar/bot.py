@@ -43,11 +43,11 @@ AJUDA = """<b>Radar de passagens</b> — comandos:
 /escala+ SCL SYD AKL — hub SCL, destinos além: SYD e AKL · /escala- SCL — remove o hub
 /economiaescala 20 — só avisa se ≥ 20% mais barata
 
-<b>Alertas de grupo</b>
-Cole aqui o texto de um alerta de milhas (SÃO PAULO ✈️ ..., Ida/Volta/Valor total) e eu digo se vale mais milhas ou dinheiro.
-
 <b>Milhas (no seu PC)</b>
-/milhas on|off
+/milhas on|off — o radar de milhas (Smiles) acha ofertas sozinho, devagar, no seu PC
+/latam on|off — inclui LATAM Pass (precisa do login feito no PC)
+/passomilhas 10 — 1 data a cada 10 dias na varredura de milhas
+/buscasmilhas 16 — buscas por rodada (mais = mais risco de a Smiles parar de responder)
 /milheiro 16 — quanto você paga por 1.000 milhas
 /limitemilhas SCL 90000 — avisa se ida e volta ≤ 90.000 milhas"""
 
@@ -216,6 +216,21 @@ def apply(cfg: dict, text: str) -> tuple[dict, str]:
         if cmd == "/milhas":
             cfg["milhas"]["ativo"] = a[0].lower() in ("on", "sim", "1")
             return cfg, f"✅ Milhas: {'ligado' if cfg['milhas']['ativo'] else 'desligado'}"
+        if cmd == "/passomilhas":
+            n = int(a[0])
+            if not 3 <= n <= 30:
+                return cfg, "Escolha de 3 a 30 dias."
+            cfg["milhas"]["passo_dias"] = n
+            return cfg, f"✅ Milhas: 1 data a cada {n} dias (viagem de {cfg['milhas']['duracoes']} dias)."
+        if cmd == "/latam":
+            cfg["milhas"]["latam"] = a[0].lower() in ("on", "sim", "1")
+            return cfg, f"✅ LATAM Pass: {'ligado' if cfg['milhas']['latam'] else 'desligado'}"
+        if cmd == "/buscasmilhas":
+            n = int(a[0])
+            if not 2 <= n <= 40:
+                return cfg, "Escolha entre 2 e 40 buscas por rodada."
+            cfg["milhas"]["buscas_por_rodada"] = n
+            return cfg, f"✅ {n} buscas de milhas por rodada (a cada 2 h; 1 viagem = 2 buscas)."
         if cmd == "/milheiro":
             cfg["milhas"]["custo_milheiro"] = float(a[0].replace(",", "."))
             return cfg, f"✅ Custo do milheiro: R$ {cfg['milhas']['custo_milheiro']:g}"
