@@ -125,6 +125,12 @@ def main() -> int:
             reply = top_text(min(nn, 25))
         elif cmd == "/agora":
             reply = dispatch_scan()
+        elif not text.startswith("/") and "milhas" in text.lower() and "ida" in text.lower():
+            from . import avaliar
+            try:
+                reply = avaliar.avaliar(text, float(cfg["milhas"]["custo_milheiro"]))
+            except Exception as e:  # noqa: BLE001
+                reply = f"Não consegui avaliar esse alerta ({type(e).__name__}). Cole o texto completo do grupo."
         else:
             new, reply = bot.apply(cfg, text)
             if new != cfg:

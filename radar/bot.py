@@ -43,6 +43,9 @@ AJUDA = """<b>Radar de passagens</b> — comandos:
 /escala+ SCL SYD AKL — hub SCL, destinos além: SYD e AKL · /escala- SCL — remove o hub
 /economiaescala 20 — só avisa se ≥ 20% mais barata
 
+<b>Alertas de grupo</b>
+Cole aqui o texto de um alerta de milhas (SÃO PAULO ✈️ ..., Ida/Volta/Valor total) e eu digo se vale mais milhas ou dinheiro.
+
 <b>Milhas (no seu PC)</b>
 /milhas on|off
 /milheiro 16 — quanto você paga por 1.000 milhas
