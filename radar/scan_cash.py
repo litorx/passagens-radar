@@ -119,14 +119,20 @@ def run(dry: bool = False, force: bool = False, max_minutes: float = 25, limit: 
                     f"🆕 Calendário abriu: {nome(dest)} já tem preço até {dep:%d/%m/%Y}")
 
     alerts = []
-    for origin, dest, dep, ret, r, bucket in results:
+    if not cid and not dry:
+        print("AVISO: sem TELEGRAM_CHAT_ID; coletando historico sem enviar alertas")
+        results_for_alerts = []
+    else:
+        results_for_alerts = results
+    for origin, dest, dep, ret, r, bucket in results_for_alerts:
         v = judge(r.price, store.sample(st, bucket), cfg["sensibilidade"])
         cap = cfg["limites"].get(dest)
         why = v.reason if v.is_outlier else (f"abaixo do seu limite ({brl(cap)})" if cap and r.price <= cap else "")
         if why and store.should_alert(st, f"{origin}-{dest}-{dep}-{ret}", r.price):
             alerts.append(fmt_alert(origin, dest, dep, ret, r.price, r.airlines, why))
 
-    alerts += escala_step(cfg, st, today, origens, t0, max_minutes)
+    if cid or dry:
+        alerts += escala_step(cfg, st, today, origens, t0, max_minutes)
 
     quiet = config.in_quiet_hours(cfg)
     pend = st.setdefault("pendentes", [])
