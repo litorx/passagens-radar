@@ -45,6 +45,7 @@ def search(retries: int = 3, **args) -> dict:
         try:
             r = requests.post(URL, headers=HEAD, json=payload, timeout=120)
             if r.status_code == 200:
+                r.encoding = "utf-8"   # SSE sem charset: requests assumiria latin-1 e quebraria acentos
                 res = _parse_sse(r.text).get("result", {})
                 content = res.get("content") or []
                 data = json.loads(content[0]["text"]) if content else res.get("structuredContent") or {}
