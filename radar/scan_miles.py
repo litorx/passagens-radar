@@ -48,14 +48,18 @@ def cash_reference(dest: str) -> float | None:
 
 
 def evaluate(m: dict, hist_sample: list, mc: dict, cash: float | None):
-    """(motivo, pct, rotulo) ou ('', None, '') quando NAO e uma oferta realmente boa."""
+    """(motivo, pct, rotulo) ou ('', None, '') quando NAO e uma oferta realmente boa.
+    O custo em milhas INCLUI as taxas de embarque quando conhecidas (LATAM): sem isso uma oferta com
+    taxas altas parece melhor do que e (ex.: Medellin 69.285 milhas + R$ 909 de taxas ~ empata com o dinheiro)."""
     custo = mc["custo_milheiro"]
-    custo_milhas = m["milhas"] / 1000 * custo
+    custo_total = m["milhas"] / 1000 * custo + (m.get("taxas") or 0)
+    m["custo_total"] = custo_total
     if cash:
         m["cash"] = cash
-        if cash / m["milhas"] * 1000 >= custo * mc.get("exigencia", 1.5):
-            pct = (cash - custo_milhas) / cash * 100
-            return ("As milhas saem bem mais baratas que o menor preço em dinheiro", pct, "mais barato que pagar em dinheiro")
+        economia = (cash - custo_total) / cash * 100
+        if economia >= mc["sensibilidade"]:
+            return ("Pagando com milhas (já contando as taxas) sai bem mais barato que em dinheiro", economia,
+                    "mais barato que pagar em dinheiro")
     cap = mc["limites_milhas"].get(m["dest"])
     if cap and m["milhas"] <= cap:
         return f"Abaixo do seu limite ({mil(cap)} milhas)", None, ""

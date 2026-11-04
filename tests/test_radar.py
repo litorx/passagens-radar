@@ -226,5 +226,22 @@ class Store(unittest.TestCase):
         self.assertTrue(store.should_alert(st, "k", 900))
 
 
+class MilhasAvalia(unittest.TestCase):
+    MC = {"custo_milheiro": 16.0, "sensibilidade": 35, "limites_milhas": {}}
+
+    def test_taxas_altas_derrubam_a_falsa_oferta(self):
+        from radar import scan_miles
+        # Medellin real: 69.285 milhas + R$ 909 de taxas vs R$ 2.087 em dinheiro => quase empate, NAO e oferta
+        m = {"dest": "MDE", "milhas": 69285, "taxas": 909}
+        self.assertEqual(scan_miles.evaluate(m, [], self.MC, 2087)[0], "")
+
+    def test_oferta_real_passa(self):
+        from radar import scan_miles
+        m = {"dest": "FRA", "milhas": 100000, "taxas": 300}   # R$ 1.900 em milhas vs R$ 5.000 em dinheiro
+        why, pct, _ = scan_miles.evaluate(m, [], self.MC, 5000)
+        self.assertTrue(why)
+        self.assertGreater(pct, 60)
+
+
 if __name__ == "__main__":
     unittest.main()

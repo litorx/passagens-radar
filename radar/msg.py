@@ -40,13 +40,14 @@ def deal_milhas(m: dict, motivo: str, custo_milheiro: float, ref_pct: float | No
          f"✈️ <b>{mil(m['milhas'])} milhas</b> ida e volta",
          f"      ida {mil(m['ida'])} · volta {mil(m['volta'])}"]
     if m.get("cash"):
+        tx = m.get("taxas") or 0
         L += [f"💵 ou <b>{brl(m['cash'])}</b> no menor preço em dinheiro",
-              f"🧾 Pagando com milhas você gasta ≈ <b>{brl(custo_milhas)}</b> (a R$ {custo_milheiro:g} o milheiro) + taxas",
+              (f"🧾 Pagando com milhas: ≈ <b>{brl(custo_milhas + tx)}</b> no total "
+               f"({brl(custo_milhas)} em milhas a R$ {custo_milheiro:g} o milheiro + {brl(tx)} de taxas)" if tx else
+               f"🧾 Pagando com milhas: ≈ <b>{brl(custo_milhas)}</b> (a R$ {custo_milheiro:g} o milheiro) + taxas"),
               f"💡 Cada mil milhas rendem <b>{brl(m['cash'] / m['milhas'] * 1000)}</b>"]
     else:
         L.append(f"🧾 ≈ <b>{brl(custo_milhas)}</b> em milhas (a R$ {custo_milheiro:g} o milheiro) + taxas")
-    if m.get("taxas"):
-        L.append(f"🏷️ Taxas de embarque: ≈ {brl(m['taxas'])}")
     if m.get("mm"):
         L.append(f"➕ Milhas+dinheiro (ida): {mil(m['mm'][0])} milhas + {brl(m['mm'][1])}")
     L.append("")
