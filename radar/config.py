@@ -35,10 +35,21 @@ DEFAULT = {
     "milhas": {"ativo": True, "custo_milheiro": 16.0, "limites_milhas": {}, "sensibilidade": 35, "exigencia": 1.5, "latam": True,
                "buscas_por_rodada": 16, "descanso_horas": 3,
                "passo_dias": 10, "duracoes": [7],
-               # destinos proprios do radar de milhas (onde as tarifas em milhas costumam ser muito boas)
-               "destinos": ["FRA", "LIS", "MAD", "CDG", "FCO", "LHR", "MIA", "MCO", "JFK", "AUA", "PUJ", "CUN",
-                            "SSA", "REC", "FOR", "NAT", "MCZ", "VIX", "FLN", "POA", "SCL", "LIM", "BOG", "PTY",
-                            "EZE", "MDE", "UIO", "CUZ", "MVD", "ASU"]},
+               # destinos do radar de milhas: Nordeste + Frankfurt + Aruba + America do Sul (escolha do usuario)
+               "destinos": ["SSA", "REC", "FOR", "NAT", "MCZ", "JPA", "AJU", "SLZ", "FRA", "AUA",
+                            "SCL", "EZE", "AEP", "MVD", "LIM", "ASU", "COR", "MDZ", "BOG", "MDE", "CTG", "UIO",
+                            "CUZ", "LPB", "VVI", "BRC", "USH", "FTE", "PUQ", "GYE"],
+               # PADROES medidos (03/11/2026, Kiwi): viagens de ida e volta costumam ter 4-9 noites no Nordeste,
+               # 7-11 no Caribe e 14-16 na Europa; as mais baratas saem de segunda a quinta e fora do pico
+               "estadias": {"FRA": [14, 16, 21], "LIS": [14, 16], "MAD": [14, 16], "CDG": [14, 16], "FCO": [14, 16],
+                            "LHR": [14, 16], "AUA": [7, 10], "PUJ": [7, 10], "CUN": [7, 10], "MIA": [7, 10],
+                            "MCO": [7, 10], "JFK": [7, 10], "SSA": [5, 7], "REC": [5, 7], "FOR": [5, 7],
+                            "NAT": [5, 7], "MCZ": [5, 7, 9], "JPA": [5, 7], "AJU": [5, 7], "SLZ": [5, 7]},
+               "estadia_padrao": [7, 10],
+               "evitar_sabado": True,                    # saidas de sabado quase nunca estao entre as mais baratas
+               "evitar_pico": [[12, 18, 1, 8]],          # (mes_ini, dia_ini, mes_fim, dia_fim): fim de ano
+               "explorar_vizinhas": 2,                   # achou data boa? testa +-2 dias (ofertas vem em blocos de datas)
+               "latam_descanso_horas": 6},
     "regiao": "america_do_sul",
     # Escala "oculta": passagem ate um destino MAIS LONGE com conexao no hub, mais barata que ir ao hub.
     # Zona cinza: viola o contrato da companhia (so ida, so bagagem de mao). Desligue com /escala off.

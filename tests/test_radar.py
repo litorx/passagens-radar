@@ -243,5 +243,29 @@ class MilhasAvalia(unittest.TestCase):
         self.assertGreater(pct, 60)
 
 
+class MilhasPadroes(unittest.TestCase):
+    def test_combos_respeitam_filtros(self):
+        from radar import scan_miles
+        cfg = config.load(config.DATA / "x.json")
+        mc = cfg["milhas"]
+        c = scan_miles.montar_combos(cfg, mc, date(2026, 11, 3))
+        self.assertTrue(c)
+        self.assertFalse(any(d.weekday() == 5 for _, d, _ in c))                       # sem sabado
+        self.assertFalse(any(scan_miles.em_pico(d, mc["evitar_pico"]) for _, d, _ in c))  # sem pico
+        self.assertTrue(all(n in (14, 16, 21) for dest, _, n in c if dest == "FRA"))   # estadia tipica Europa
+
+    def test_pico_virada_de_ano(self):
+        from radar import scan_miles
+        pk = [[12, 18, 1, 8]]
+        self.assertTrue(scan_miles.em_pico(date(2026, 12, 31), pk))
+        self.assertTrue(scan_miles.em_pico(date(2027, 1, 5), pk))
+        self.assertFalse(scan_miles.em_pico(date(2027, 3, 10), pk))
+
+    def test_regiao_nordeste(self):
+        c, r = bot.apply(config.load(config.DATA / "x.json"), "/milhasdestinos nordeste FRA AUA")
+        self.assertEqual(c["milhas"]["destinos"][:2], ["SSA", "REC"])
+        self.assertIn("AUA", c["milhas"]["destinos"])
+
+
 if __name__ == "__main__":
     unittest.main()

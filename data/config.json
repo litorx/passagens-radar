@@ -63,37 +63,136 @@
       7
     ],
     "destinos": [
-      "FRA",
-      "LIS",
-      "MAD",
-      "CDG",
-      "FCO",
-      "LHR",
-      "MIA",
-      "MCO",
-      "JFK",
-      "AUA",
-      "PUJ",
-      "CUN",
       "SSA",
       "REC",
       "FOR",
       "NAT",
       "MCZ",
-      "VIX",
-      "FLN",
-      "POA",
+      "JPA",
+      "AJU",
+      "SLZ",
+      "FRA",
+      "AUA",
       "SCL",
-      "LIM",
-      "BOG",
-      "PTY",
       "EZE",
+      "AEP",
+      "MVD",
+      "LIM",
+      "ASU",
+      "COR",
+      "MDZ",
+      "BOG",
       "MDE",
+      "CTG",
       "UIO",
       "CUZ",
-      "MVD",
-      "ASU"
-    ]
+      "LPB",
+      "VVI",
+      "BRC",
+      "USH",
+      "FTE",
+      "PUQ",
+      "GYE"
+    ],
+    "estadias": {
+      "FRA": [
+        14,
+        16,
+        21
+      ],
+      "LIS": [
+        14,
+        16
+      ],
+      "MAD": [
+        14,
+        16
+      ],
+      "CDG": [
+        14,
+        16
+      ],
+      "FCO": [
+        14,
+        16
+      ],
+      "LHR": [
+        14,
+        16
+      ],
+      "AUA": [
+        7,
+        10
+      ],
+      "PUJ": [
+        7,
+        10
+      ],
+      "CUN": [
+        7,
+        10
+      ],
+      "MIA": [
+        7,
+        10
+      ],
+      "MCO": [
+        7,
+        10
+      ],
+      "JFK": [
+        7,
+        10
+      ],
+      "SSA": [
+        5,
+        7
+      ],
+      "REC": [
+        5,
+        7
+      ],
+      "FOR": [
+        5,
+        7
+      ],
+      "NAT": [
+        5,
+        7
+      ],
+      "MCZ": [
+        5,
+        7,
+        9
+      ],
+      "JPA": [
+        5,
+        7
+      ],
+      "AJU": [
+        5,
+        7
+      ],
+      "SLZ": [
+        5,
+        7
+      ]
+    },
+    "estadia_padrao": [
+      7,
+      10
+    ],
+    "evitar_sabado": true,
+    "evitar_pico": [
+      [
+        12,
+        18,
+        1,
+        8
+      ]
+    ],
+    "explorar_vizinhas": 2,
+    "latam_descanso_horas": 6
   },
   "regiao": "america_do_sul",
   "escala_oculta": {

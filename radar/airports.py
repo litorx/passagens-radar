@@ -59,6 +59,7 @@ REGIOES = {
     "africa": ["JNB", "CPT", "LOS", "ADD", "CAI", "CMN", "NBO", "ACC", "LAD", "MPM"],
     "oceania": ["SYD", "MEL", "AKL", "BNE", "PER", "NAN"],
 }
+REGIOES["nordeste"] = ["SSA", "REC", "FOR", "NAT", "MCZ", "JPA", "AJU", "SLZ"]
 REGIOES["mundo"] = [c for r in REGIOES.values() for c in r]
 
 ALIAS = {

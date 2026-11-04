@@ -83,6 +83,33 @@ def evaluate(m: dict, hist_sample: list, mc: dict, cash: float | None):
     return "", None, ""
 
 
+def em_pico(d: date, picos: list) -> bool:
+    md = (d.month, d.day)
+    for m1, d1, m2, d2 in picos:
+        ini, fim = (m1, d1), (m2, d2)
+        if (ini <= md <= fim) if ini <= fim else (md >= ini or md <= fim):
+            return True
+    return False
+
+
+def montar_combos(cfg: dict, mc: dict, today: date) -> list:
+    """(destino, ida, estadia) usando os PADROES: estadia tipica por destino, sem sabado, sem pico de fim de ano."""
+    ini, fim = config.janela(cfg, today)
+    end = min(fim, today + timedelta(days=dates.SALE_HORIZON_DAYS))
+    step = max(1, int(mc.get("passo_dias", 10)))
+    dests = sorted(mc.get("destinos") or cfg["destinos"], key=lambda d: -(cash_reference(d) or 0))
+    out = []
+    for dest in dests:
+        stays = mc.get("estadias", {}).get(dest) or mc.get("estadia_padrao", [7])
+        d, k = ini, 0
+        while d <= end:
+            if not (mc.get("evitar_sabado", True) and d.weekday() == 5) and not em_pico(d, mc.get("evitar_pico", [])):
+                out.append((dest, d, int(stays[k % len(stays)])))
+            d += timedelta(days=step)
+            k += 1
+    return out
+
+
 def run(dry: bool = False, force: bool = False, limit: int | None = None, latam: bool = False) -> int:
     config.load_env()
     cfg = config.load()
@@ -97,16 +124,26 @@ def run(dry: bool = False, force: bool = False, limit: int | None = None, latam:
         return 0
     cid = config.chat_id(cfg)
     budget = limit or int(mc.get("buscas_por_rodada", 10))
-    # espaco de busca ENXUTO p/ milhas: 1 data a cada `passo_dias`, viagens de `duracoes`; destinos de dinheiro
-    # mais CARO primeiro (ali a milha rende mais); sem referencia de dinheiro vao por ultimo.
-    cfg_m = dict(cfg, passo_dias=mc.get("passo_dias", 10), duracoes=mc.get("duracoes", [7]))
-    cfg_m["destinos"] = sorted(mc.get("destinos") or cfg["destinos"], key=lambda d: -(cash_reference(d) or 0))
-    combos = dates.build_combos(cfg_m, date.today(), None)
-    random.Random(7).shuffle(combos)   # cobre destinos e datas variados a cada rodada
     n_comb = max(1, budget // 2)
-    chunk, st["cursor"] = dates.pick(combos, int(st.get("cursor", 0)), n_comb)
+    combos = montar_combos(cfg, mc, date.today())
+    random.Random(7).shuffle(combos)   # cobre destinos e datas variados a cada rodada
+    # 1o as datas VIZINHAS de leituras boas (ofertas vem em blocos de datas), depois a rotacao normal
+    fila = [(d, date.fromisoformat(x), int(n)) for d, x, n in st.get("explorar", [])]
+    prio, fila = fila[: max(0, n_comb // 2)], fila[max(0, n_comb // 2):]
+    resto, st["cursor"] = dates.pick(combos, int(st.get("cursor", 0)), n_comb - len(prio))
+    chunk = prio + resto
+    st["explorar"] = [[d, x.isoformat(), n] for d, x, n in fila]
+    vistos = set(st.get("vistos", []))
     origens = cfg["origens"] or ["GRU"]
-    print(f"{len(chunk)} combinacoes ({len(chunk) * 2} buscas) de {len(combos)}")
+    print(f"{len(chunk)} combinacoes ({len(chunk) * 2} buscas); {len(prio)} vizinhas; {len(combos)} no espaco de busca")
+
+    def vizinhas(dest, dep, dur):
+        k_ = int(mc.get("explorar_vizinhas", 2))
+        for dd in range(-k_, k_ + 1):
+            nd = dep + timedelta(days=dd)
+            item = [dest, nd.isoformat(), dur]
+            if dd and nd > date.today() + timedelta(days=7) and f"{dest}|{nd}|{dur}" not in vistos and item not in st["explorar"]:
+                st["explorar"].append(item)
 
     found, fails, blocked = [], 0, False
     from .sources import smiles as S
@@ -114,6 +151,7 @@ def run(dry: bool = False, force: bool = False, limit: int | None = None, latam:
         for i, (dest, dep, dur) in enumerate(chunk):
             origin = origens[(int(st["cursor"]) + i) % len(origens)]
             ret = dep + timedelta(days=dur)
+            vistos.add(f"{dest}|{dep}|{dur}")
             ida = sm.search(origin, dest, dep)
             time.sleep(random.uniform(25, 45))
             volta = sm.search(dest, origin, ret) if ida else None
@@ -132,14 +170,21 @@ def run(dry: bool = False, force: bool = False, limit: int | None = None, latam:
                 continue
             bucket = f"M|{dest}"
             m = {"origin": origin, "dest": dest, "dep": dep, "ret": ret, "ida": a, "volta": b, "milhas": a + b,
-                 "mm": ida.get("milhas_mais_dinheiro"), "programa": "Smiles", "bucket": bucket}
+                 "mm": ida.get("milhas_mais_dinheiro"), "programa": "Smiles", "bucket": bucket,
+                 "url": S._url(origin, dest, dep)}
             why, pct, lab = evaluate(m, store.sample(st, bucket), mc, cash_for_dates(origin, dest, dep, ret))
             store.add_obs(st, bucket, m["milhas"], d=dep.isoformat(), r=ret.isoformat(), o=origin)
-            print(f"  Smiles {dest} {dep}->{ret}: {mil(m['milhas'])} milhas" + (f" | OFERTA: {why}" if why else ""))
+            cash_txt = brl(m["cash"]) if m.get("cash") else "?"
+            print(f"  Smiles {dest} {dep}->{ret}: {mil(m['milhas'])} milhas, dinheiro {cash_txt}"
+                  + (f" | OFERTA: {why}" if why else ""))
+            promissor = m.get("cash") and m.get("custo_total") and (m["cash"] - m["custo_total"]) / m["cash"] * 100 >= 0.7 * mc["sensibilidade"]
+            if why or promissor:
+                vizinhas(dest, dep, dur)
             if why and store.should_alert(st, f"M-{origin}-{dest}-{dep}-{ret}", m["milhas"]):
                 found.append((m, why, pct, lab))
 
-    if (latam or mc.get("latam")) and not blocked:
+    latam_ok = not st.get("latam_descanso_ate") or now >= datetime.fromisoformat(st["latam_descanso_ate"])
+    if (latam or mc.get("latam")) and not blocked and latam_ok:
         from .sources import latam as L
         with L.Latam() as lt:
             for i, (dest, dep, dur) in enumerate(chunk[:max(1, n_comb // 2)]):
@@ -147,19 +192,30 @@ def run(dry: bool = False, force: bool = False, limit: int | None = None, latam:
                 ret = dep + timedelta(days=dur)
                 ida = lt.search(origin, dest, dep, back=ret)
                 time.sleep(random.uniform(25, 45))
-                volta = lt.search(dest, origin, ret, back=ret + timedelta(days=dur)) if ida else None
+                if not ida:   # LATAM respondeu 403/vazio (visto em 03/11/2026): NAO insiste
+                    st["latam_descanso_ate"] = (now + timedelta(hours=float(mc.get("latam_descanso_horas", 6)))).isoformat(timespec="minutes")
+                    print("LATAM sem resposta (provavel bloqueio anti-robo): descansando", mc.get("latam_descanso_horas", 6), "h")
+                    break
+                volta = lt.search(dest, origin, ret, back=ret + timedelta(days=dur))
                 time.sleep(random.uniform(25, 45))
-                if not ida or not volta:
+                if not volta:
                     continue
                 m = {"origin": origin, "dest": dest, "dep": dep, "ret": ret, "ida": ida["milhas"],
                      "volta": volta["milhas"], "milhas": ida["milhas"] + volta["milhas"],
-                     "taxas": ida["taxas"] + volta["taxas"], "programa": "LATAM Pass", "bucket": f"M|{dest}|latam"}
+                     "taxas": ida["taxas"] + volta["taxas"], "programa": "LATAM Pass", "bucket": f"M|{dest}|latam",
+                     "url": L.url(origin, dest, dep, ret)}
                 why, pct, lab = evaluate(m, store.sample(st, m["bucket"]), mc, cash_for_dates(origin, dest, dep, ret))
                 store.add_obs(st, m["bucket"], m["milhas"], d=dep.isoformat(), r=ret.isoformat(), o=origin)
-                print(f"  LATAM {dest} {dep}->{ret}: {mil(m['milhas'])} milhas" + (f" | OFERTA: {why}" if why else ""))
+                print(f"  LATAM {dest} {dep}->{ret}: {mil(m['milhas'])} milhas + {brl(m['taxas'])} taxas"
+                      + (f" | OFERTA: {why}" if why else ""))
+                if why:
+                    vizinhas(dest, dep, dur)
                 if why and store.should_alert(st, f"L-{origin}-{dest}-{dep}-{ret}", m["milhas"]):
                     found.append((m, why, pct, lab))
+    elif (latam or mc.get("latam")) and not latam_ok:
+        print("LATAM em descanso ate", st["latam_descanso_ate"])
 
+    st["vistos"] = sorted(vistos)[-3000:]
     quiet = config.in_quiet_hours(cfg)
     texts = [msg.deal_milhas(m, w, mc["custo_milheiro"], pct, lab or "abaixo do normal") for m, w, pct, lab in found]
     if quiet:
@@ -174,7 +230,7 @@ def run(dry: bool = False, force: bool = False, limit: int | None = None, latam:
     store.prune(st)
     if not dry:
         store.save(STATE, st)
-    print(f"ok: {len(found)} ofertas nesta rodada")
+    print(f"ok: {len(found)} ofertas nesta rodada; fila de vizinhas: {len(st['explorar'])}")
     return 0
 
 
