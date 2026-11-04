@@ -46,6 +46,7 @@ AJUDA = """<b>Radar de passagens</b> — comandos:
 <b>Milhas (no seu PC)</b>
 /milhas on|off — o radar de milhas (Smiles) acha ofertas sozinho, devagar, no seu PC
 /latam on|off — inclui LATAM Pass (precisa do login feito no PC)
+/milhasdestinos europa brasil AUA — destinos do radar de milhas
 /passomilhas 10 — 1 data a cada 10 dias na varredura de milhas
 /buscasmilhas 16 — buscas por rodada (mais = mais risco de a Smiles parar de responder)
 /milheiro 16 — quanto você paga por 1.000 milhas
@@ -216,6 +217,15 @@ def apply(cfg: dict, text: str) -> tuple[dict, str]:
         if cmd == "/milhas":
             cfg["milhas"]["ativo"] = a[0].lower() in ("on", "sim", "1")
             return cfg, f"✅ Milhas: {'ligado' if cfg['milhas']['ativo'] else 'desligado'}"
+        if cmd == "/milhasdestinos":
+            nomes = [regiao(x) for x in a]
+            codes = _codes([x for x, n in zip(a, nomes) if n is None])
+            novos = [c for n in nomes if n for c in REGIOES[n]] + codes
+            if not novos:
+                return cfg, "Use: /milhasdestinos europa brasil FRA AUA (regiões e/ou códigos)"
+            cfg["milhas"]["destinos"] = list(dict.fromkeys(novos))
+            return cfg, (f"✅ Radar de milhas varre {len(cfg['milhas']['destinos'])} destinos. "
+                         "Quanto mais destinos, mais demora a volta completa.")
         if cmd == "/passomilhas":
             n = int(a[0])
             if not 3 <= n <= 30:

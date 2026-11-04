@@ -23,6 +23,7 @@ from datetime import date, datetime, timedelta
 from . import config, dates, msg, notify, store
 from .airports import nome
 from .outlier import judge
+from .sources import kiwi
 
 STATE = config.LOCAL / "state_miles.json"
 
@@ -45,6 +46,19 @@ def cash_reference(dest: str) -> float | None:
     except Exception:  # noqa: BLE001
         pass
     return None
+
+
+def cash_for_dates(origin: str, dest: str, dep: date, ret: date) -> float | None:
+    """Menor preco em DINHEIRO ida+volta para as MESMAS datas (Kiwi). Cai para o menor do periodo se falhar."""
+    try:
+        d = kiwi.search(flyFrom=origin, flyTo=dest, departureDate=kiwi.dmy(dep), returnDate=kiwi.dmy(ret),
+                        currency="BRL", locale="pt", sort="price", allow_self_transfer=False)
+        rows = kiwi.rows(d)
+        if rows:
+            return rows[0]["total"]
+    except Exception:  # noqa: BLE001
+        pass
+    return cash_reference(dest)
 
 
 def evaluate(m: dict, hist_sample: list, mc: dict, cash: float | None):
@@ -86,7 +100,7 @@ def run(dry: bool = False, force: bool = False, limit: int | None = None, latam:
     # espaco de busca ENXUTO p/ milhas: 1 data a cada `passo_dias`, viagens de `duracoes`; destinos de dinheiro
     # mais CARO primeiro (ali a milha rende mais); sem referencia de dinheiro vao por ultimo.
     cfg_m = dict(cfg, passo_dias=mc.get("passo_dias", 10), duracoes=mc.get("duracoes", [7]))
-    cfg_m["destinos"] = sorted(cfg["destinos"], key=lambda d: -(cash_reference(d) or 0))
+    cfg_m["destinos"] = sorted(mc.get("destinos") or cfg["destinos"], key=lambda d: -(cash_reference(d) or 0))
     combos = dates.build_combos(cfg_m, date.today(), None)
     random.Random(7).shuffle(combos)   # cobre destinos e datas variados a cada rodada
     n_comb = max(1, budget // 2)
@@ -119,7 +133,7 @@ def run(dry: bool = False, force: bool = False, limit: int | None = None, latam:
             bucket = f"M|{dest}"
             m = {"origin": origin, "dest": dest, "dep": dep, "ret": ret, "ida": a, "volta": b, "milhas": a + b,
                  "mm": ida.get("milhas_mais_dinheiro"), "programa": "Smiles", "bucket": bucket}
-            why, pct, lab = evaluate(m, store.sample(st, bucket), mc, cash_reference(dest))
+            why, pct, lab = evaluate(m, store.sample(st, bucket), mc, cash_for_dates(origin, dest, dep, ret))
             store.add_obs(st, bucket, m["milhas"], d=dep.isoformat(), r=ret.isoformat(), o=origin)
             print(f"  Smiles {dest} {dep}->{ret}: {mil(m['milhas'])} milhas" + (f" | OFERTA: {why}" if why else ""))
             if why and store.should_alert(st, f"M-{origin}-{dest}-{dep}-{ret}", m["milhas"]):
@@ -140,7 +154,7 @@ def run(dry: bool = False, force: bool = False, limit: int | None = None, latam:
                 m = {"origin": origin, "dest": dest, "dep": dep, "ret": ret, "ida": ida["milhas"],
                      "volta": volta["milhas"], "milhas": ida["milhas"] + volta["milhas"],
                      "taxas": ida["taxas"] + volta["taxas"], "programa": "LATAM Pass", "bucket": f"M|{dest}|latam"}
-                why, pct, lab = evaluate(m, store.sample(st, m["bucket"]), mc, cash_reference(dest))
+                why, pct, lab = evaluate(m, store.sample(st, m["bucket"]), mc, cash_for_dates(origin, dest, dep, ret))
                 store.add_obs(st, m["bucket"], m["milhas"], d=dep.isoformat(), r=ret.isoformat(), o=origin)
                 print(f"  LATAM {dest} {dep}->{ret}: {mil(m['milhas'])} milhas" + (f" | OFERTA: {why}" if why else ""))
                 if why and store.should_alert(st, f"L-{origin}-{dest}-{dep}-{ret}", m["milhas"]):

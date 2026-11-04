@@ -34,7 +34,11 @@ DEFAULT = {
     "limites": {},                  # ex.: {"SCL": 1100}  (aviso se <= valor, em R$)
     "milhas": {"ativo": True, "custo_milheiro": 16.0, "limites_milhas": {}, "sensibilidade": 35, "exigencia": 1.5, "latam": True,
                "buscas_por_rodada": 16, "descanso_horas": 3,
-               "passo_dias": 10, "duracoes": [7]},
+               "passo_dias": 10, "duracoes": [7],
+               # destinos proprios do radar de milhas (onde as tarifas em milhas costumam ser muito boas)
+               "destinos": ["FRA", "LIS", "MAD", "CDG", "FCO", "LHR", "MIA", "MCO", "JFK", "AUA", "PUJ", "CUN",
+                            "SSA", "REC", "FOR", "NAT", "MCZ", "VIX", "FLN", "POA", "SCL", "LIM", "BOG", "PTY",
+                            "EZE", "MDE", "UIO", "CUZ", "MVD", "ASU"]},
     "regiao": "america_do_sul",
     # Escala "oculta": passagem ate um destino MAIS LONGE com conexao no hub, mais barata que ir ao hub.
     # Zona cinza: viola o contrato da companhia (so ida, so bagagem de mao). Desligue com /escala off.

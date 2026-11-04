@@ -89,7 +89,7 @@ def run(dry: bool = False, force: bool = False, limit_dest: int | None = None, m
     if not p:
         notify.tg_send("⚠️ Período inválido: a janela é menor que a estadia mínima. Use /periodo ou /duracoes.", cid, dry)
         return 0
-    dests = list(cfg["destinos"])
+    dests = list(dict.fromkeys(list(cfg["destinos"]) + list(cfg["milhas"].get("destinos", []))))  # + destinos de milhas
     nd = limit_dest or int(cfg["destinos_por_rodada"])
     cur = int(st.get("cursor", 0)) % max(1, len(dests))
     chunk = [dests[(cur + i) % len(dests)] for i in range(min(nd, len(dests)))]
@@ -172,7 +172,7 @@ def run(dry: bool = False, force: bool = False, limit_dest: int | None = None, m
 
     rows = []
     for dest, r in res.items():
-        if dest in cfg["destinos"] and r["top"]:
+        if r["top"]:
             rows.append({"dest": dest, **r["top"][0]})
     rows.sort(key=lambda x: x["total"])
     top = {"last_run": now.isoformat(timespec="minutes"), "de": p["ini"].isoformat(), "ate": p["fim"].isoformat(),
