@@ -267,5 +267,46 @@ class MilhasPadroes(unittest.TestCase):
         self.assertIn("AUA", c["milhas"]["destinos"])
 
 
+class SemRepeticao(unittest.TestCase):
+    def test_mesma_oferta_com_data_deslocada_nao_repete(self):
+        st = {}
+        self.assertTrue(store.should_alert_dest(st, "D-EZE", 1374))
+        self.assertFalse(store.should_alert_dest(st, "D-EZE", 1375))   # 1 dia depois, mesmo preco
+        self.assertFalse(store.should_alert_dest(st, "D-EZE", 1330))   # so 3% menor
+        self.assertTrue(store.should_alert_dest(st, "D-EZE", 1200))    # 13% menor: avisa
+
+    def test_milhas_varias_datas_viram_um_aviso(self):
+        from radar import scan_miles
+        d = date
+        mk = lambda dep, mi: ({"dest": "BOG", "programa": "Smiles", "dep": dep, "ret": dep, "milhas": mi}, "ok", 40.0, "x")
+        found = [mk(d(2027, 6, 1), 86000), mk(d(2027, 6, 3), 86000), mk(d(2027, 6, 5), 87000)]
+        out = scan_miles.agrupar({}, found)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0][0]["milhas"], 86000)
+        self.assertEqual(len(out[0][4]), 2)          # as outras 2 datas viram "datas parecidas"
+
+
+class TierList(unittest.TestCase):
+    def test_tiers(self):
+        from radar import msg
+        rows = [{"dest": "SCL", "pct": 42.0, "total": 1147}, {"dest": "LIM", "pct": 27.0, "total": 1365},
+                {"dest": "EZE", "pct": 3.0, "total": 2000}]
+        t = msg.tierlist("TIER LIST", "sub", rows, msg.TIERS_DINHEIRO, lambda r: f"{r['dest']} {r['total']}")
+        self.assertIn("Tier S", t)
+        self.assertIn("Tier A", t)
+        self.assertIn("Tier D", t)
+        self.assertLess(t.index("Tier S"), t.index("Tier A"))
+
+    def test_janelas_quentes_aumentam_a_densidade(self):
+        from radar import scan_miles
+        cfg = config.load(config.DATA / "x.json")
+        mc = cfg["milhas"]
+        c = scan_miles.montar_combos(cfg, mc, date(2026, 11, 3))
+        mcz = sorted(d for dest, d, _ in c if dest == "MCZ")
+        quentes = [d for d in mcz if (d.month, d.day) >= (3, 25) and (d.month, d.day) <= (5, 31) and d.year == 2027]
+        resto = [d for d in mcz if d.year == 2027 and d.month in (7, 8)]
+        self.assertGreater(len(quentes) / 68, len(resto) / 62 * 1.5)   # mais datas por dia na janela quente
+
+
 if __name__ == "__main__":
     unittest.main()

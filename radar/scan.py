@@ -63,6 +63,31 @@ def fmt_escala(hub: str, alem: str, far: dict, direct: dict) -> str:
         f"🔗 {far['url']}"])
 
 
+def tier_ciclo(cfg: dict, st: dict, res: dict, p: dict) -> str:
+    """Tier list dos destinos no fim do ciclo: menor preco de cada um vs o normal dele (mediana)."""
+    import statistics
+    rows = []
+    for dest, r in res.items():
+        if not r.get("top"):
+            continue
+        best = r["top"][0]
+        amostra = list(r.get("amostra", [])) + store.sample(st, f"K|{dest}")
+        normal = statistics.median(amostra) if len(amostra) >= 3 else None
+        pct = (normal - best["total"]) / normal * 100 if normal else 0.0
+        rows.append({"dest": dest, "total": best["total"], "pct": max(0.0, pct), "dep": best["dep"], "ret": best.get("ret")})
+
+    def linha(r):
+        d0 = date.fromisoformat(r["dep"])
+        quando = f" · {d0:%d/%m}" + (f"→{date.fromisoformat(r['ret']):%d/%m/%y}" if r["ret"] else "")
+        return f"{nome(r['dest'])}: <b>{brl(r['total'])}</b> (−{r['pct']:.0f}%){quando}"
+    sub = f"Fim do ciclo · {p['ini']:%d/%m/%Y} → {p['fim']:%d/%m/%Y} · menor preço de cada destino vs o normal dele"
+    txt = msg.tierlist("TIER LIST DO CICLO · dinheiro", sub, rows, msg.TIERS_DINHEIRO, linha)
+    baratos = sorted(rows, key=lambda x: x["total"])[:5]
+    txt += chr(10) + chr(10) + "💸 <b>Mais baratos em valor absoluto</b>" + chr(10) + chr(10).join(
+        f"   {i}. {nome(r['dest'])}: {brl(r['total'])}" for i, r in enumerate(baratos, 1))
+    return txt
+
+
 def search_window(cfg: dict, dest: str, args_fn, win: dict) -> list[dict]:
     a = args_fn(win, cfg.get("bagagem", "mao"))
     a["allow_self_transfer"] = bool(cfg.get("autotransferencia", False))
@@ -131,7 +156,7 @@ def run(dry: bool = False, force: bool = False, limit_dest: int | None = None, m
         pct = v_per.drop_pct if v_per.is_outlier else v_his.drop_pct if v_his.is_outlier else None
         store.add_obs(st, bucket, best["total"], d=best["dep"], r=best["ret"])
         res[dest] = {"top": allrows[:3], "t": now.isoformat(timespec="minutes"), "amostra": sample}
-        if why and store.should_alert(st, f"{dest}-{best['dep']}-{best['ret']}", best["total"]):
+        if why and store.should_alert_dest(st, f"D-{dest}", best["total"]):
             deals.append(msg.deal_dinheiro(dest, best, why, pct))
         print(f"  {dest}: menor {brl(best['total'])} ({best['dep']}→{best['ret']}) {', '.join(best['air'])}")
         time.sleep(random.uniform(0.6, 1.4))
@@ -153,12 +178,16 @@ def run(dry: bool = False, force: bool = False, limit_dest: int | None = None, m
                     d_far = [r for r in d_far if hub in r["route"][1:-1]]
                     if d_hub and d_far:
                         eco = (d_hub[0]["total"] - d_far[0]["total"]) / d_hub[0]["total"] * 100
-                        if eco >= esc.get("min_economia_pct", 20) and store.should_alert(
-                                st, f"E-{hub}-{alem}-{d_far[0]['dep']}", d_far[0]["total"]):
+                        if eco >= esc.get("min_economia_pct", 20) and store.should_alert_dest(
+                                st, f"E-{hub}-{alem}", d_far[0]["total"]):
                             deals.append(fmt_escala(hub, alem, d_far[0], d_hub[0]))
                 except Exception as e:  # noqa: BLE001
                     print(f"  escala {hub}->{alem} falhou ({e})", file=sys.stderr)
                 time.sleep(random.uniform(0.6, 1.4))
+
+    # FIM DE CICLO (percorreu a lista toda): resumo com tier list dos destinos
+    if cur + len(chunk) >= len(dests) and not dry:
+        deals.append(tier_ciclo(cfg, st, res, p))
 
     quiet = config.in_quiet_hours(cfg)
     pend = st.setdefault("pendentes", [])

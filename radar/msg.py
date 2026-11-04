@@ -31,7 +31,8 @@ def barra(pct: float) -> str:
     return "🟩" * n + "⬜" * (10 - n)
 
 
-def deal_milhas(m: dict, motivo: str, custo_milheiro: float, ref_pct: float | None, label: str = "abaixo do normal") -> str:
+def deal_milhas(m: dict, motivo: str, custo_milheiro: float, ref_pct: float | None, label: str = "abaixo do normal",
+                extras: list | None = None) -> str:
     """m: dest, origin, dep, ret, ida, volta, milhas, programa, cash(opt), mm(opt), taxas(opt), url(opt)."""
     custo_milhas = m["milhas"] / 1000 * custo_milheiro
     L = [f"🔥 <b>OFERTA EM MILHAS</b> · {m['programa']}", "",
@@ -54,6 +55,9 @@ def deal_milhas(m: dict, motivo: str, custo_milheiro: float, ref_pct: float | No
     if ref_pct:
         L.append(f"{barra(ref_pct)} <b>{ref_pct:.0f}% {label}</b>")
     L.append(f"✅ {motivo}")
+    if extras:
+        outras = " · ".join(f"{d.day:02d}/{d.month:02d}→{r.day:02d}/{r.month:02d} ({mil(mi)})" for d, r, mi in extras[:8])
+        L.append(f"🗓️ Datas parecidas: {outras}")
     if m.get("url"):
         L.append(f"🔗 {m['url']}")
     L.append("<i>Preços mudam a qualquer momento. Confirme no site antes de emitir.</i>")
@@ -80,3 +84,32 @@ def deal_dinheiro(dest: str, r: dict, motivo: str, pct: float | None) -> str:
         L.append(f"🔗 {r['url']}")
     L.append("<i>Preço do Kiwi.com. Confira o total final antes de pagar.</i>")
     return NL.join(L)
+
+
+TIERS_DINHEIRO = [("S", "🥇", "imperdível", 35), ("A", "🥈", "muito boa", 25), ("B", "🥉", "boa", 15), ("C", "▫️", "razoável", 5)]
+TIERS_MILHAS = [("S", "🥇", "imperdível", 50), ("A", "🥈", "muito boa", 35), ("B", "🥉", "boa", 20), ("C", "▫️", "razoável", 5)]
+
+
+def _tier(pct: float, tiers) -> str:
+    for t, _, _, lim in tiers:
+        if pct >= lim:
+            return t
+    return "D"
+
+
+def tierlist(titulo: str, sub: str, rows: list[dict], tiers, linha) -> str:
+    """rows: dest + pct (quanto mais barato que a referencia). linha(r) -> texto do item."""
+    por = {t[0]: [] for t in tiers}
+    resto = []
+    for r in sorted(rows, key=lambda x: -x["pct"]):
+        t = _tier(r["pct"], tiers)
+        (por[t] if t in por else resto).append(r)
+    L = [f"📊 <b>{titulo}</b>", f"<i>{sub}</i>", ""]
+    for t, ico, nome_, lim in tiers:
+        if por[t]:
+            L.append(f"{ico} <b>Tier {t}</b> · {nome_} (≥{lim}%)")
+            L += [f"   • {linha(r)}" for r in por[t][:8]]
+            L.append("")
+    if resto:
+        L.append(f"⬜ <b>Tier D</b> · sem oferta ({len(resto)}): " + ", ".join(nome(r["dest"]) for r in resto[:12]))
+    return NL.join(L).strip()

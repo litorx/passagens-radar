@@ -17,7 +17,8 @@ STATE = config.DATA / "state.json"
 def api(method: str, **params):
     tok = os.environ["TELEGRAM_BOT_TOKEN"]
     r = requests.post(f"https://api.telegram.org/bot{tok}/{method}", data=params, timeout=30)
-    r.raise_for_status()
+    if r.status_code != 200:   # nao deixa o erro imprimir a URL (ela contem o token do bot)
+        raise RuntimeError(f"Telegram {method}: HTTP {r.status_code}")
     return r.json()
 
 

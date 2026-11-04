@@ -49,7 +49,12 @@ DEFAULT = {
                "evitar_sabado": True,                    # saidas de sabado quase nunca estao entre as mais baratas
                "evitar_pico": [[12, 18, 1, 8]],          # (mes_ini, dia_ini, mes_fim, dia_fim): fim de ano
                "explorar_vizinhas": 2,                   # achou data boa? testa +-2 dias (ofertas vem em blocos de datas)
-               "latam_descanso_horas": 6},
+               "latam_descanso_horas": 6,
+               # JANELAS QUENTES: onde os grupos costumam achar oferta (Fortaleza fev-mar, Maceio abr-mai, Aruba fev,
+               # Salvador/Recife mar-mai). Dentro delas o radar testa uma data a cada `passo_quente` dias.
+               "janelas_quentes": {"FOR": [[2, 15, 3, 31]], "MCZ": [[3, 25, 5, 31]], "AUA": [[2, 1, 3, 15]],
+                                   "SSA": [[2, 15, 5, 31]], "REC": [[2, 15, 5, 31]], "NAT": [[2, 15, 5, 31]]},
+               "passo_quente": 4},
     "regiao": "america_do_sul",
     # Escala "oculta": passagem ate um destino MAIS LONGE com conexao no hub, mais barata que ir ao hub.
     # Zona cinza: viola o contrato da companhia (so ida, so bagagem de mao). Desligue com /escala off.

@@ -58,3 +58,16 @@ def remember_alert(state: dict, text: str, keep: int = 30) -> None:
     rec = state.setdefault("recentes", [])
     rec.append({"t": utcnow().isoformat(timespec="minutes"), "txt": text})
     del rec[:-keep]
+
+
+def should_alert_dest(state: dict, key: str, price: float, drop: float = 0.08, cooldown_days: int = 14) -> bool:
+    """Um aviso por destino: so repete se o preco cair >= `drop` ou passar o `cooldown_days`.
+    (Mudar a data em 1 dia NAO conta como oferta nova.)"""
+    rec = state.setdefault("alertados_dest", {}).get(key)
+    now = utcnow()
+    if rec:
+        idade = (now - datetime.fromisoformat(rec["t"])).days
+        if price > rec["p"] * (1 - drop) and idade < cooldown_days:
+            return False
+    state["alertados_dest"][key] = {"p": int(price), "t": now.isoformat(timespec="minutes")}
+    return True

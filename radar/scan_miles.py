@@ -102,12 +102,55 @@ def montar_combos(cfg: dict, mc: dict, today: date) -> list:
     for dest in dests:
         stays = mc.get("estadias", {}).get(dest) or mc.get("estadia_padrao", [7])
         d, k = ini, 0
+        quentes = mc.get("janelas_quentes", {}).get(dest, [])
         while d <= end:
             if not (mc.get("evitar_sabado", True) and d.weekday() == 5) and not em_pico(d, mc.get("evitar_pico", [])):
                 out.append((dest, d, int(stays[k % len(stays)])))
-            d += timedelta(days=step)
+            d += timedelta(days=int(mc.get("passo_quente", 4)) if quentes and em_pico(d, quentes) else step)
             k += 1
     return out
+
+
+def _melhor_do_ciclo(st: dict, m: dict) -> None:
+    """Guarda a melhor leitura de cada destino no ciclo (para o resumo/tier list)."""
+    if not m.get("cash") or not m.get("custo_total"):
+        return
+    eco = (m["cash"] - m["custo_total"]) / m["cash"] * 100
+    cur = st.setdefault("ciclo", {}).get(m["dest"])
+    if cur is None or eco > cur["pct"]:
+        st["ciclo"][m["dest"]] = {"pct": eco, "milhas": m["milhas"], "cash": m["cash"], "programa": m["programa"],
+                                  "dep": m["dep"].isoformat(), "ret": m["ret"].isoformat()}
+
+
+def agrupar(st: dict, found: list) -> list:
+    """Um aviso por (programa, destino): o melhor + 'datas parecidas'. Repetidos viram um so (cooldown 14 dias)."""
+    grupos = {}
+    for m, why, pct, lab in found:
+        grupos.setdefault((m["programa"], m["dest"]), []).append((m, why, pct, lab))
+    out = []
+    for (prog, dest), itens in grupos.items():
+        itens.sort(key=lambda x: x[0]["milhas"])
+        m, why, pct, lab = itens[0]
+        if not store.should_alert_dest(st, f"MD-{prog}-{dest}", m["milhas"]):
+            continue
+        extras = [(x[0]["dep"], x[0]["ret"], x[0]["milhas"]) for x in itens[1:]]
+        out.append((m, why, pct, lab, extras))
+    return out
+
+
+def tier_milhas(st: dict, cfg: dict) -> str | None:
+    ciclo = st.get("ciclo", {})
+    if not ciclo:
+        return None
+    rows = [{"dest": d, "pct": max(0.0, v["pct"]), **v} for d, v in ciclo.items()]
+
+    def linha(r):
+        a, b = date.fromisoformat(r["dep"]), date.fromisoformat(r["ret"])
+        return (f"{nome(r['dest'])}: <b>{mil(r['milhas'])} milhas</b> vs {brl(r['cash'])} "
+                f"(−{r['pct']:.0f}%) · {a:%d/%m}→{b:%d/%m/%y} · {r['programa']}")
+    return msg.tierlist("TIER LIST DO CICLO · milhas",
+                        "Fim do ciclo · melhor economia de cada destino pagando com milhas (já com taxas, vs dinheiro das mesmas datas)",
+                        rows, msg.TIERS_MILHAS, linha)
 
 
 def run(dry: bool = False, force: bool = False, limit: int | None = None, latam: bool = False) -> int:
@@ -130,7 +173,8 @@ def run(dry: bool = False, force: bool = False, limit: int | None = None, latam:
     # 1o as datas VIZINHAS de leituras boas (ofertas vem em blocos de datas), depois a rotacao normal
     fila = [(d, date.fromisoformat(x), int(n)) for d, x, n in st.get("explorar", [])]
     prio, fila = fila[: max(0, n_comb // 2)], fila[max(0, n_comb // 2):]
-    resto, st["cursor"] = dates.pick(combos, int(st.get("cursor", 0)), n_comb - len(prio))
+    old_cursor = int(st.get("cursor", 0))
+    resto, st["cursor"] = dates.pick(combos, old_cursor, n_comb - len(prio))
     chunk = prio + resto
     st["explorar"] = [[d, x.isoformat(), n] for d, x, n in fila]
     vistos = set(st.get("vistos", []))
@@ -180,7 +224,8 @@ def run(dry: bool = False, force: bool = False, limit: int | None = None, latam:
             promissor = m.get("cash") and m.get("custo_total") and (m["cash"] - m["custo_total"]) / m["cash"] * 100 >= 0.7 * mc["sensibilidade"]
             if why or promissor:
                 vizinhas(dest, dep, dur)
-            if why and store.should_alert(st, f"M-{origin}-{dest}-{dep}-{ret}", m["milhas"]):
+            _melhor_do_ciclo(st, m)
+            if why:
                 found.append((m, why, pct, lab))
 
     latam_ok = not st.get("latam_descanso_ate") or now >= datetime.fromisoformat(st["latam_descanso_ate"])
@@ -210,14 +255,21 @@ def run(dry: bool = False, force: bool = False, limit: int | None = None, latam:
                       + (f" | OFERTA: {why}" if why else ""))
                 if why:
                     vizinhas(dest, dep, dur)
-                if why and store.should_alert(st, f"L-{origin}-{dest}-{dep}-{ret}", m["milhas"]):
+                _melhor_do_ciclo(st, m)
+                if why:
                     found.append((m, why, pct, lab))
     elif (latam or mc.get("latam")) and not latam_ok:
         print("LATAM em descanso ate", st["latam_descanso_ate"])
 
     st["vistos"] = sorted(vistos)[-3000:]
     quiet = config.in_quiet_hours(cfg)
-    texts = [msg.deal_milhas(m, w, mc["custo_milheiro"], pct, lab or "abaixo do normal") for m, w, pct, lab in found]
+    texts = [msg.deal_milhas(m, w, mc["custo_milheiro"], pct, lab or "abaixo do normal", extras)
+             for m, w, pct, lab, extras in agrupar(st, found)]
+    if old_cursor + len(resto) >= len(combos):          # FIM DE CICLO: resumo com tier list
+        t = tier_milhas(st, cfg)
+        if t:
+            texts.append(t)
+        st["ciclo"] = {}
     if quiet:
         st.setdefault("pendentes", []).extend(texts)
     else:
