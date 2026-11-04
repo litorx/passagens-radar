@@ -308,5 +308,23 @@ class TierList(unittest.TestCase):
         self.assertGreater(len(quentes) / 68, len(resto) / 62 * 1.5)   # mais datas por dia na janela quente
 
 
+class ConferirLatam(unittest.TestCase):
+    def test_links_so_dos_destinos_com_dados(self):
+        from radar import scan
+        cfg = config.load(config.DATA / "x.json")
+        res = {"FOR": {"top": [{"dep": "2027-02-22", "ret": "2027-03-02", "total": 901}]},
+               "MCZ": {"top": [{"dep": "2027-04-05", "ret": None, "total": 700}]}}
+        c = scan.candidatos_latam(cfg, res)
+        self.assertEqual([x[0] for x in c], ["FOR", "MCZ"])
+        self.assertEqual(c[1][2], date(2027, 4, 12))          # sem volta: assume 7 dias
+        txt = scan.bloco_conferir(cfg, res)
+        self.assertIn("redemption=true", txt)
+        self.assertIn("&amp;", txt)                            # URL escapada p/ HTML do Telegram
+        self.assertIn("Fortaleza", txt)
+
+    def test_latam_desligada_por_padrao(self):
+        self.assertFalse(config.load(config.DATA / "x.json")["milhas"]["latam"])
+
+
 if __name__ == "__main__":
     unittest.main()

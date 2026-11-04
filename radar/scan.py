@@ -7,6 +7,7 @@ Para cada destino: busca os MENORES valores ida+volta dentro do periodo (/period
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import random
 import sys
@@ -63,6 +64,44 @@ def fmt_escala(hub: str, alem: str, far: dict, direct: dict) -> str:
         f"🔗 {far['url']}"])
 
 
+GOOGLE_AI = ("https://www.google.com/search?udm=50&q="
+             "voos+de+S%C3%A3o+Paulo+para+Fortaleza+em+milhas+LATAM+Pass")
+
+
+def candidatos_latam(cfg: dict, res: dict, n: int = 6) -> list:
+    """Datas MAIS promissoras para conferir a mao na LATAM Pass: destinos das janelas quentes (onde os grupos
+    costumam achar oferta) na data mais barata em dinheiro (data barata = baixa demanda), + Frankfurt/Aruba."""
+    quentes = list(cfg["milhas"].get("janelas_quentes", {}))
+    ordem = quentes + [d for d in ("FRA", "AUA", "LIS", "MIA") if d not in quentes]
+    out = []
+    for dest in ordem:
+        r = res.get(dest)
+        if not r or not r.get("top"):
+            continue
+        b = r["top"][0]
+        dep = date.fromisoformat(b["dep"])
+        ret = date.fromisoformat(b["ret"]) if b.get("ret") else dep + timedelta(days=7)
+        out.append((dest, dep, ret, b["total"]))
+    return out[:n]
+
+
+def bloco_conferir(cfg: dict, res: dict) -> str:
+    """Links prontos (1 toque, logado na LATAM): a LATAM bloqueia robo, entao a conferencia final e sua."""
+    from .sources import latam
+    cands = candidatos_latam(cfg, res)
+    if not cands:
+        return ""
+    nl = chr(10)
+    L = ["🔎 <b>Conferir à mão na LATAM Pass</b> (abra logado; 1 toque cada)"]
+    for dest, dep, ret, cash in cands:
+        u = html.escape(latam.url("GRU", dest, dep, ret))
+        L.append(f'   • <a href="{u}">{nome(dest)} {dep:%d/%m}→{ret:%d/%m/%y}</a> · dinheiro {brl(cash)}')
+    L.append("   <i>Se as milhas ida+volta × R$ 16 por mil ficarem bem abaixo do dinheiro, vale.</i>")
+    g = html.escape(GOOGLE_AI)
+    L.append(f'💡 Quando o Google AI Mode mostrar milhas LATAM Pass no Brasil dá para automatizar: <a href="{g}">teste aqui</a>')
+    return nl.join(L)
+
+
 def tier_ciclo(cfg: dict, st: dict, res: dict, p: dict) -> str:
     """Tier list dos destinos no fim do ciclo: menor preco de cada um vs o normal dele (mediana)."""
     import statistics
@@ -85,7 +124,8 @@ def tier_ciclo(cfg: dict, st: dict, res: dict, p: dict) -> str:
     baratos = sorted(rows, key=lambda x: x["total"])[:5]
     txt += chr(10) + chr(10) + "💸 <b>Mais baratos em valor absoluto</b>" + chr(10) + chr(10).join(
         f"   {i}. {nome(r['dest'])}: {brl(r['total'])}" for i, r in enumerate(baratos, 1))
-    return txt
+    extra = bloco_conferir(cfg, res)
+    return txt + (chr(10) + chr(10) + extra if extra else "")
 
 
 def search_window(cfg: dict, dest: str, args_fn, win: dict) -> list[dict]:

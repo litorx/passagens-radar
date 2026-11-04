@@ -122,6 +122,17 @@ def main() -> int:
         elif cmd == "/ultimos":
             rec = store.load(STATE).get("recentes", [])[-8:]
             reply = "\n\n".join(r["txt"] for r in rec) or "Nenhum aviso ainda."
+        elif cmd in ("/tier", "/ciclo"):
+            from . import scan
+            from .sources import kiwi
+            stt = store.load(STATE)
+            pl = kiwi.plan(cfg)
+            reply = (scan.tier_ciclo(cfg, stt, stt.get("resultados", {}), pl) if pl and stt.get("resultados")
+                     else "Ainda sem dados. Mande /agora para varrer.")
+        elif cmd == "/conferir":
+            from . import scan
+            stt = store.load(STATE)
+            reply = scan.bloco_conferir(cfg, stt.get("resultados", {})) or "Ainda sem dados. Mande /agora."
         elif cmd == "/top":
             nn = int(text.split()[1]) if len(text.split()) > 1 and text.split()[1].isdigit() else 10
             reply = top_text(min(nn, 25))

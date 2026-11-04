@@ -32,7 +32,7 @@ DEFAULT = {
     "silencio": {"inicio": 23, "fim": 7},   # sem avisos entre 23h e 7h (horario de Brasilia); null = desliga
     "sensibilidade": 35,            # % abaixo do normal para avisar (so ofertas MUITO boas)
     "limites": {},                  # ex.: {"SCL": 1100}  (aviso se <= valor, em R$)
-    "milhas": {"ativo": True, "custo_milheiro": 16.0, "limites_milhas": {}, "sensibilidade": 35, "exigencia": 1.5, "latam": True,
+    "milhas": {"ativo": True, "custo_milheiro": 16.0, "limites_milhas": {}, "sensibilidade": 35, "exigencia": 1.5, "latam": False,
                "buscas_por_rodada": 16, "descanso_horas": 3,
                "passo_dias": 10, "duracoes": [7],
                # destinos do radar de milhas: Nordeste + Frankfurt + Aruba + America do Sul (escolha do usuario)

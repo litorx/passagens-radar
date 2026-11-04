@@ -10,6 +10,8 @@ from .airports import REGIOES, nome, regiao
 
 AJUDA = """<b>Radar de passagens</b> — comandos:
 /top — os menores valores encontrados agora (no período)
+/tier — tier list dos destinos (também sai sozinha no fim de cada ciclo)
+/conferir — links prontos para conferir à mão na LATAM Pass (1 toque)
 /periodo 31/12/2026 05/01/2027 — só essa janela (testa TODAS as combinações de ida e volta)
 /periodo dez/2026 dez/2027 — janela longa · /periodo hoje dez/2027
 /status — como está tudo
